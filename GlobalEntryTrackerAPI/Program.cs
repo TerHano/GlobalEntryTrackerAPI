@@ -1,7 +1,57 @@
+using Database;
+using Database.Repositories;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Quartz;
 using Quartz.AspNetCore;
+using BusinessLayer;
 
 var builder = WebApplication.CreateBuilder(args);
+
+
+var allowedOrigins = builder.Configuration.GetValue<string>("AllowedOrigins") ?? "";
+
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(name: "WerewolfServerPolicy",
+        policy =>
+        {
+            policy.AllowAnyMethod();
+            policy.AllowAnyHeader();
+            policy.WithOrigins(allowedOrigins);
+            policy.AllowCredentials();
+        });
+});
+
+
+var connectionString = builder.Configuration.GetValue<string>("Database:ConnectionString");
+if (string.IsNullOrEmpty(connectionString))
+{
+    throw new Exception("ConnectionString is missing.");
+}
+
+builder.Services.AddDbContextPool<GlobalEntryTrackerDbContext>(opt => opt.UseNpgsql(connectionString));
+
+builder.Services.AddScoped<AppointmentLocationRepository>();
+
+
+//builder.Services.AddScoped<JwtService>();
+builder.Services.AddScoped<AppointmentLocationBusiness>();
+
+// builder.Services.AddSingleton<IUserIdProvider, NameUserIdProvider>();
+
+//Mappers
+builder.Services.AddAutoMapper(typeof(AppointmentLocationBusiness),typeof(UserAppointmentTrackerBusiness));
+
+
+//Validators
+//builder.Services.AddScoped<IValidator<PlayerDTO>, PlayerDTOValidator>();
+//builder.Services.AddScoped<IValidator<UpdateRoleSettingsRequest>, RoleSettingsRequestValidator>();
+
+
+//builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -44,9 +94,6 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 
-app.MapGet("/weatherforecast", () =>
-{
-
-});
+app.MapGet("/weatherforecast", () => { });
 
 app.Run();

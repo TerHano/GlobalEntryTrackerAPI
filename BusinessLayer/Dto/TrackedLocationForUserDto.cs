@@ -1,14 +1,11 @@
 using GlobalEntryTrackerAPI;
 
-namespace Database.Entities;
+namespace BusinessLayer.Dto;
 
-public class TrackedLocationForUserEntity
+public class TrackedLocationForUserDto
 {
     public int Id { get; set; }
-    public int UserId { get; set; }
-    public required UserEntity User { get; set; }
     public int LocationId { get; set; }
-    public required AppointmentLocationEntity Location { get; set; }
     public bool Enabled { get; set; }
     public NotificationType NotificationType { get; set; }
     public DateOnly StartDate { get; set; }

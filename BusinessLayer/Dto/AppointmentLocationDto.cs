@@ -1,11 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Database.Entities;
+namespace BusinessLayer.Dto;
 
-public class AppointmentLocationEntity
+public class AppointmentLocationDto
 {
     public int Id { get; init; }
-    public int ExternalId { get; init; }
     [MaxLength(100)]
     public required string Name { get; set; }
     [MaxLength(100)]

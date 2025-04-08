@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace GlobalEntryTrackerAPI.Models.Entities;
+namespace Database.Entities;
 
 public class UserEntity
 {
