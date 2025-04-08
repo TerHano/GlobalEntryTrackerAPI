@@ -1,0 +1,6 @@
+﻿services:
+  globalentrytrackerapi:
+    image: globalentrytrackerapi
+    build:
+      context: .
+      dockerfile: GlobalEntryTrackerAPI/Dockerfile
