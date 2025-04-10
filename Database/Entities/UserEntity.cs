@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Database.Entities.NotificationSettings;
 
 namespace Database.Entities;
 
@@ -15,4 +16,7 @@ public class UserEntity
     [MaxLength(40)] public required string LastName { get; set; }
 
     public required DateTime CreatedAt { get; init; }
+
+    public int? DiscordNotificationSettingsId { get; init; }
+    public DiscordNotificationSettingsEntity? DiscordNotificationSettings { get; init; }
 }

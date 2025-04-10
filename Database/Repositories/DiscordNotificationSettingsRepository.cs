@@ -12,4 +12,12 @@ public class DiscordNotificationSettingsRepository(GlobalEntryTrackerDbContext c
             .FirstOrDefaultAsync();
         return settings;
     }
+
+    public async Task<int> CreateNotificationSettingsForUser(
+        DiscordNotificationSettingsEntity entity)
+    {
+        var newSettings = await context.DiscordNotificationSettings.AddAsync(entity);
+        await context.SaveChangesAsync();
+        return newSettings.Entity.Id;
+    }
 }

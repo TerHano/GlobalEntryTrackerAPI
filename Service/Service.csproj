@@ -10,4 +10,8 @@
         <ProjectReference Include="..\Database\Database.csproj"/>
     </ItemGroup>
 
+    <ItemGroup>
+        <PackageReference Include="Quartz.AspNetCore" Version="3.14.0"/>
+    </ItemGroup>
+
 </Project>

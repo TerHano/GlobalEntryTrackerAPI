@@ -28,14 +28,14 @@ public class DiscordNotificationService(
 
     public async Task SendTestNotification<T>(T settingsToTest)
     {
-        if (settingsToTest != null && settingsToTest is DiscordNotificationSettingsEntity settings)
+        if (settingsToTest != null && settingsToTest is TestDiscordNotificationDto settings)
         {
             var testMessage = GenerateTestMessage();
             await SendMessageThroughWebhook(settings, testMessage);
         }
         else
         {
-            logger.LogError("Settings passed is not of type DiscordNotificationSettingsEntity");
+            logger.LogError("Settings passed is not of type TestDiscordNotificationDto");
         }
     }
 
@@ -44,6 +44,20 @@ public class DiscordNotificationService(
         DiscordWebhookMessageDto message)
     {
         var messageJson = JsonSerializer.Serialize(message);
+        var request = new StringContent(messageJson, Encoding.UTF8, "application/json");
+        var response = await httpClient.PostAsync(settings.WebhookUrl, request);
+        if (response.StatusCode != HttpStatusCode.NoContent) throw new Exception();
+    }
+
+    private async Task SendMessageThroughWebhook(TestDiscordNotificationDto settings,
+        DiscordWebhookMessageDto message)
+    {
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+        };
+        var messageJson = JsonSerializer.Serialize(message, options);
+        logger.LogInformation(messageJson);
         var request = new StringContent(messageJson, Encoding.UTF8, "application/json");
         var response = await httpClient.PostAsync(settings.WebhookUrl, request);
         if (response.StatusCode != HttpStatusCode.NoContent) throw new Exception();

@@ -5,11 +5,14 @@ using Business.Mappers;
 using Database;
 using Database.Repositories;
 using GlobalEntryTrackerAPI.Endpoints;
+using GlobalEntryTrackerAPI.Handlers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Quartz;
 using Quartz.AspNetCore;
+using Service;
+using Service.Notification;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,6 +43,7 @@ builder.Services.AddScoped<AppointmentLocationRepository>();
 builder.Services.AddScoped<TrackedLocationForUserRepository>();
 builder.Services.AddScoped<NotificationTypeRepository>();
 builder.Services.AddScoped<UserRepository>();
+builder.Services.AddScoped<DiscordNotificationSettingsRepository>();
 
 
 //builder.Services.AddScoped<JwtService>();
@@ -47,13 +51,20 @@ builder.Services.AddScoped<AppointmentLocationBusiness>();
 builder.Services.AddScoped<UserAppointmentTrackerBusiness>();
 builder.Services.AddScoped<NotificationBusiness>();
 builder.Services.AddScoped<UserBusiness>();
+builder.Services.AddScoped<DiscordNotificationSettingsBusiness>();
+builder.Services.AddScoped<NotificationManagerService>();
+
+builder.Services.AddScoped<DiscordNotificationService>();
+
+builder.Services.AddHttpClient();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 
 // builder.Services.AddSingleton<IUserIdProvider, NameUserIdProvider>();
 
 //Mappers
 builder.Services.AddAutoMapper(typeof(AppointmentLocationMapper), typeof(NotificationTypeMapper),
-    typeof(UserMapper));
+    typeof(UserMapper), typeof(DiscordNotificationSettingsMapper));
 
 
 //Validators
@@ -175,6 +186,7 @@ app.MapLocationEndpoints();
 app.MapLocationTrackerEndpoints();
 app.MapNotificationEndpoints();
 app.MapAuthEndpoints();
+app.MapNotificationSettingsEndpoints();
 
 app.UseAuthentication();
 app.UseAuthorization();

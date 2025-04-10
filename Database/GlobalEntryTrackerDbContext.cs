@@ -12,8 +12,6 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
     public DbSet<TrackedLocationForUserEntity> UserTrackedLocations { get; set; }
     public DbSet<DiscordNotificationSettingsEntity> DiscordNotifications { get; set; }
     public DbSet<NotificationTypeEntity> NotificationTypes { get; set; }
-
-
     public DbSet<DiscordNotificationSettingsEntity> DiscordNotificationSettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -32,5 +30,10 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
             .HasOne(e => e.NotificationType)
             .WithMany()
             .HasForeignKey(e => e.NotificationTypeId);
+
+        modelBuilder.Entity<UserEntity>()
+            .HasOne(e => e.DiscordNotificationSettings)
+            .WithOne()
+            .HasForeignKey<UserEntity>(e => e.DiscordNotificationSettingsId);
     }
 }
