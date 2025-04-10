@@ -1,5 +1,3 @@
-using GlobalEntryTrackerAPI;
-
 namespace Database.Entities;
 
 public class TrackedLocationForUserEntity
@@ -10,7 +8,8 @@ public class TrackedLocationForUserEntity
     public int LocationId { get; set; }
     public required AppointmentLocationEntity Location { get; set; }
     public bool Enabled { get; set; }
-    public NotificationType NotificationType { get; set; }
+    public int NotificationTypeId { get; set; }
+    public NotificationTypeEntity NotificationType { get; set; }
     public DateOnly StartDate { get; set; }
     public DateOnly EndDate { get; set; }
 }

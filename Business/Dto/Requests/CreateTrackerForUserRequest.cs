@@ -1,6 +1,6 @@
 using GlobalEntryTrackerAPI;
 
-namespace BusinessLayer.Dto.Requests;
+namespace Business.Dto.Requests;
 
 public class CreateTrackerForUserRequest
 {

@@ -1,8 +1,8 @@
 using GlobalEntryTrackerAPI;
 
-namespace BusinessLayer.Dto.Requests;
+namespace Business.Dto;
 
-public class UpdateTrackerForUserRequest
+public class TrackedLocationForUserDto
 {
     public int Id { get; set; }
     public int LocationId { get; set; }

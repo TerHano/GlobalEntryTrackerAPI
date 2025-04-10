@@ -1,26 +1,27 @@
 using Database.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Database.Repositories;
 
 public class AppointmentLocationRepository(GlobalEntryTrackerDbContext context)
 {
-    public List<AppointmentLocationEntity> GetAllAppointmentLocations()
+    public async Task<List<AppointmentLocationEntity>> GetAllAppointmentLocations()
     {
-        return context.AppointmentLocations.ToList();
+        return await context.AppointmentLocations.ToListAsync();
     }
-    public AppointmentLocationEntity GetAppointmentLocationByExternalId(int id)
+
+    public async Task<AppointmentLocationEntity> GetAppointmentLocationByExternalId(int id)
     {
-        var appointmentLocation = context.AppointmentLocations.FirstOrDefault(x => x.ExternalId == id);
+        var appointmentLocation = await context.AppointmentLocations
+            .FirstOrDefaultAsync(x => x.ExternalId == id);
         if (appointmentLocation == null)
-        {
             throw new NullReferenceException("Appointment location not found");
-        }
         return appointmentLocation;
     }
 
-    public void AddAppointmentLocation(AppointmentLocationEntity appointmentLocation)
+    public async Task CreateAppointmentLocation(AppointmentLocationEntity appointmentLocation)
     {
-        context.AppointmentLocations.Add(appointmentLocation);
-        context.SaveChanges();
+        await context.AppointmentLocations.AddAsync(appointmentLocation);
+        await context.SaveChangesAsync();
     }
 }

@@ -1,20 +1,25 @@
+using System.Security.Claims;
+using System.Text;
+using Business;
+using Business.Mappers;
 using Database;
 using Database.Repositories;
-using Microsoft.AspNetCore.SignalR;
+using GlobalEntryTrackerAPI.Endpoints;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Quartz;
 using Quartz.AspNetCore;
-using BusinessLayer;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
+const string globalEntryTrackerPolicy = "GlobalEntryTrackerPolicy";
 var allowedOrigins = builder.Configuration.GetValue<string>("AllowedOrigins") ?? "";
 
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(name: "WerewolfServerPolicy",
+    options.AddPolicy(globalEntryTrackerPolicy,
         policy =>
         {
             policy.AllowAnyMethod();
@@ -26,23 +31,29 @@ builder.Services.AddCors(options =>
 
 
 var connectionString = builder.Configuration.GetValue<string>("Database:ConnectionString");
-if (string.IsNullOrEmpty(connectionString))
-{
-    throw new Exception("ConnectionString is missing.");
-}
+if (string.IsNullOrEmpty(connectionString)) throw new Exception("ConnectionString is missing.");
 
-builder.Services.AddDbContextPool<GlobalEntryTrackerDbContext>(opt => opt.UseNpgsql(connectionString));
+builder.Services.AddDbContextPool<GlobalEntryTrackerDbContext>(opt =>
+    opt.UseNpgsql(connectionString));
 
 builder.Services.AddScoped<AppointmentLocationRepository>();
+builder.Services.AddScoped<TrackedLocationForUserRepository>();
+builder.Services.AddScoped<NotificationTypeRepository>();
+builder.Services.AddScoped<UserRepository>();
 
 
 //builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<AppointmentLocationBusiness>();
+builder.Services.AddScoped<UserAppointmentTrackerBusiness>();
+builder.Services.AddScoped<NotificationBusiness>();
+builder.Services.AddScoped<UserBusiness>();
+
 
 // builder.Services.AddSingleton<IUserIdProvider, NameUserIdProvider>();
 
 //Mappers
-builder.Services.AddAutoMapper(typeof(AppointmentLocationBusiness),typeof(UserAppointmentTrackerBusiness));
+builder.Services.AddAutoMapper(typeof(AppointmentLocationMapper), typeof(NotificationTypeMapper),
+    typeof(UserMapper));
 
 
 //Validators
@@ -56,6 +67,75 @@ builder.Services.AddAutoMapper(typeof(AppointmentLocationBusiness),typeof(UserAp
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+var authIssuer = builder.Configuration.GetValue<string>("Auth:Issuer");
+var authAudience = builder.Configuration.GetValue<string>("Auth:Audience");
+var authSigningKey = builder.Configuration.GetValue<string>("Auth:SigningKey");
+builder.Services.AddAuthentication(options =>
+{
+    // Identity made Cookie authentication the default.
+    // However, we want JWT Bearer Auth to be the default.
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(options =>
+{
+    // Configure the Authority to the expected value for
+    // the authentication provider. This ensures the token
+    // is appropriately validated.
+    //options.Authority = "AuthorityURL"; // TODO: Update URL
+
+    // Sending the access token in the query string is required when using WebSockets or ServerSentEvents
+    // due to a limitation in Browser APIs. We restrict it to only calls to the
+    // SignalR hub in this code.
+    // See https://docs.microsoft.com/aspnet/core/signalr/security#access-token-logging
+    // for more information about security considerations when using
+    // the query string to transmit the access token.
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = false,
+        ValidateAudience = false,
+        ValidateLifetime = false,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = authIssuer,
+        //ValidAudience = authAudience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authSigningKey))
+    };
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            // Get user ID from the JWT's claims (e.g., "sub" claim)
+            var externalUserId =
+                context.Principal?.FindFirstValue(ClaimTypes
+                    .NameIdentifier); // Or other user identifier claim
+            if (string.IsNullOrEmpty(externalUserId))
+            {
+                context.Fail("User ID not found in claims");
+                return;
+            }
+
+            await using var dbContext =
+                context.HttpContext.RequestServices
+                    .GetRequiredService<GlobalEntryTrackerDbContext>();
+
+            var user = await dbContext.Users.FirstOrDefaultAsync(user =>
+                user.ExternalId.Equals(externalUserId));
+
+            if (user == null)
+            {
+                context.Fail("User not found");
+                return;
+            }
+
+            var claims = new List<Claim>
+            {
+                new("InternalId", user.Id.ToString())
+            };
+            var identity = new ClaimsIdentity(claims);
+            context.Principal?.AddIdentity(identity);
+        }
+    };
+});
 
 builder.Services.AddQuartz(q =>
 {
@@ -76,6 +156,7 @@ builder.Services.AddQuartz(q =>
     //     .WithIdentity("SampleJob-trigger")
     //     .WithCronSchedule("0/5 * * * * ?")); // Execute every 5 seconds
 });
+builder.Services.AddAuthorization();
 
 builder.Services.AddQuartzServer(options =>
 {
@@ -86,14 +167,17 @@ builder.Services.AddQuartzServer(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
+if (app.Environment.IsDevelopment()) app.MapOpenApi();
 
 app.UseHttpsRedirection();
 
+app.MapLocationEndpoints();
+app.MapLocationTrackerEndpoints();
+app.MapNotificationEndpoints();
+app.MapAuthEndpoints();
 
-app.MapGet("/weatherforecast", () => { });
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseCors(globalEntryTrackerPolicy);
 
 app.Run();
