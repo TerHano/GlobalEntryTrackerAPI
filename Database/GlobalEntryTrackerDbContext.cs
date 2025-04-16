@@ -26,14 +26,9 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
             .WithMany()
             .HasForeignKey(e => e.UserId);
 
-        modelBuilder.Entity<TrackedLocationForUserEntity>()
-            .HasOne(e => e.NotificationType)
-            .WithMany()
-            .HasForeignKey(e => e.NotificationTypeId);
-
         modelBuilder.Entity<UserEntity>()
             .HasOne(e => e.DiscordNotificationSettings)
-            .WithOne()
+            .WithOne(e => e.User)
             .HasForeignKey<UserEntity>(e => e.DiscordNotificationSettingsId);
     }
 }

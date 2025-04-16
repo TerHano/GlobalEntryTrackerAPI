@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using Database.Entities;
 using Database.Entities.NotificationSettings;
 using Database.Repositories;
 using Microsoft.Extensions.Logging;
@@ -14,14 +15,20 @@ public class DiscordNotificationService(
     HttpClient httpClient)
     : INotificationService
 {
+    private readonly JsonSerializerOptions _jsonSerializerOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+    };
+
     public async Task SendNotification(
-        LocationAppointmentWithDetailsDto appointment, int userId)
+        List<LocationAppointmentDto> appointments, AppointmentLocationEntity locationInformation,
+        int userId)
     {
         var settings =
             await discordNotificationSettingsRepository.GetNotificationSettingsForUser(userId);
         if (settings is { Enabled: true })
         {
-            var message = GenerateDiscordMessageFromAppointment(appointment);
+            var message = GenerateDiscordMessageFromAppointment(appointments, locationInformation);
             await SendMessageThroughWebhook(settings, message);
         }
     }
@@ -39,11 +46,32 @@ public class DiscordNotificationService(
         }
     }
 
+    private List<DiscordWebhookMessageDto.Field> GetAvailableAppointmentFields(
+        List<LocationAppointmentDto> appointments,
+        AppointmentLocationEntity locationInformation)
+    {
+        var fields = new List<DiscordWebhookMessageDto.Field>
+        {
+            new()
+            {
+                Name = "Location",
+                Value = locationInformation.Name
+            }
+        };
+        fields.AddRange(appointments.Select(locationAppointmentDto =>
+            new DiscordWebhookMessageDto.Field
+            {
+                Name = "Appointment",
+                Value = locationAppointmentDto.StartTimestamp.ToString("MMM dd, yyyy hh:mm tt")
+            }));
+        return fields;
+    }
+
 
     private async Task SendMessageThroughWebhook(DiscordNotificationSettingsEntity settings,
         DiscordWebhookMessageDto message)
     {
-        var messageJson = JsonSerializer.Serialize(message);
+        var messageJson = JsonSerializer.Serialize(message, _jsonSerializerOptions);
         var request = new StringContent(messageJson, Encoding.UTF8, "application/json");
         var response = await httpClient.PostAsync(settings.WebhookUrl, request);
         if (response.StatusCode != HttpStatusCode.NoContent) throw new Exception();
@@ -83,7 +111,7 @@ public class DiscordNotificationService(
     }
 
     private DiscordWebhookMessageDto GenerateDiscordMessageFromAppointment(
-        LocationAppointmentWithDetailsDto appointment)
+        List<LocationAppointmentDto> appointments, AppointmentLocationEntity locationInformation)
     {
         var discordMessage = new DiscordWebhookMessageDto
         {
@@ -97,19 +125,7 @@ public class DiscordNotificationService(
                         "Click [here](https://ttp.cbp.dhs.gov/dashboard) to schedule your appointment",
                     Color = 16761600,
                     Fields =
-                    [
-                        new DiscordWebhookMessageDto.Field
-                        {
-                            Name = "Location",
-                            Value = appointment.Location.Name
-                        },
-
-                        new DiscordWebhookMessageDto.Field
-                        {
-                            Name = "Appointment",
-                            Value = appointment.StartTimestamp.ToShortDateString()
-                        }
-                    ]
+                        GetAvailableAppointmentFields(appointments, locationInformation)
                 }
             ]
         };

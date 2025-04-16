@@ -17,6 +17,15 @@ public static class LocationTrackerEndpoints
             return Results.Ok(trackedLocations);
         }).RequireAuthorization();
 
+        app.MapGet("/api/v1/tracked-locations/{id}", async (int id, HttpContext httpContext,
+            UserAppointmentTrackerBusiness userAppointmentTrackerBusiness) =>
+        {
+            var userId = httpContext.User.GetUserId();
+            var trackedLocations =
+                await userAppointmentTrackerBusiness.GetTrackedAppointmentLocationById(id, userId);
+            return Results.Ok(trackedLocations);
+        }).RequireAuthorization();
+
         app.MapPost("/api/v1/track-location",
             async (CreateTrackerForUserRequest request,
                 HttpContext httpContext,

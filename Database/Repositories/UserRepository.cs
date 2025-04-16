@@ -11,7 +11,13 @@ public class UserRepository(GlobalEntryTrackerDbContext context)
         await context.SaveChangesAsync();
     }
 
-    public async Task<UserEntity> GetUser(int userId)
+    public async Task UpdateUser(UserEntity user)
+    {
+        context.Users.Update(user);
+        await context.SaveChangesAsync();
+    }
+
+    public async Task<UserEntity> GetUserById(int userId)
     {
         var user = await context.Users.FindAsync(userId);
         if (user is null) throw new NullReferenceException("User does not exist");

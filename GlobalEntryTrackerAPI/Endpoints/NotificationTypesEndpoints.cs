@@ -2,7 +2,7 @@ using Business;
 
 namespace GlobalEntryTrackerAPI.Endpoints;
 
-public static class NotificationEndpoints
+public static class NotificationTypesEndpoints
 {
     public static void MapNotificationEndpoints(this WebApplication app)
     {

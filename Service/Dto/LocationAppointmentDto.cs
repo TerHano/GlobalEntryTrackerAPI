@@ -5,7 +5,6 @@ namespace Service.Dto;
 public class LocationAppointmentDto
 {
     [JsonPropertyName("locationId")] public int ExternalLocationId { get; set; }
-
     public DateTime StartTimestamp { get; set; }
     public DateTime EndTimestamp { get; set; }
     public bool Active { get; set; }

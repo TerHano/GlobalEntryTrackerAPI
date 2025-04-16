@@ -33,6 +33,16 @@ public class DiscordNotificationSettingsBusiness(
         return entityId;
     }
 
+    public async Task<int> UpdateDiscordNotificationSettingsForUser(
+        DiscordNotificationSettingsDto settings, int userId)
+    {
+        var entity = mapper.Map<DiscordNotificationSettingsEntity>(settings);
+        entity.UserId = userId;
+        var entityId =
+            await discordNotificationSettingsRepository.UpdateNotificationSettingsForUser(entity);
+        return entityId;
+    }
+
     public async Task SendDiscordTestMessage(TestDiscordNotificationDto notificationSettings)
     {
         await notificationManager.SendTestMessageForService(NotificationServiceType.Discord,

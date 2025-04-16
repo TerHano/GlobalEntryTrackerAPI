@@ -19,9 +19,24 @@ public class AppointmentLocationRepository(GlobalEntryTrackerDbContext context)
         return appointmentLocation;
     }
 
+    public async Task<AppointmentLocationEntity> GetAppointmentLocationById(int id)
+    {
+        var appointmentLocation = await context.AppointmentLocations
+            .FirstOrDefaultAsync(x => x.Id == id);
+        if (appointmentLocation == null)
+            throw new NullReferenceException("Appointment location not found");
+        return appointmentLocation;
+    }
+
     public async Task CreateAppointmentLocation(AppointmentLocationEntity appointmentLocation)
     {
         await context.AppointmentLocations.AddAsync(appointmentLocation);
+        await context.SaveChangesAsync();
+    }
+
+    public async Task UpdateAppointmentLocation(AppointmentLocationEntity appointmentLocation)
+    {
+        context.AppointmentLocations.Update(appointmentLocation);
         await context.SaveChangesAsync();
     }
 }

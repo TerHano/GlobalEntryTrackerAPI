@@ -1,3 +1,4 @@
+using Database.Entities;
 using Database.Repositories;
 using Microsoft.Extensions.Logging;
 using Service.Dto;
@@ -7,24 +8,20 @@ using Service.Notification;
 namespace Service;
 
 public class NotificationManagerService(
+    UserAppointmentValidationService userAppointmentValidationService,
     ILogger<NotificationManagerService> logger,
     AppointmentLocationRepository appointmentLocationRepository,
     IServiceProvider serviceProvider)
 {
     public async Task SendAppointmentAvailableNotifications(
-        LocationAppointmentDto locationAppointment, int userId)
+        List<LocationAppointmentDto> locationAppointments,
+        AppointmentLocationEntity appointmentLocation, int userId)
     {
-        var locationInformation =
-            await appointmentLocationRepository.GetAppointmentLocationByExternalId(
-                locationAppointment.ExternalLocationId);
-        if (locationInformation == null) throw new ApplicationException("No location found");
-        var locationAppointmentWithDetails =
-            new LocationAppointmentWithDetailsDto(locationAppointment, locationInformation);
-
         var notificationTasks = new List<Task>
         {
             SendNotificationForService(
-                NotificationServiceType.Discord, locationAppointmentWithDetails, userId)
+                NotificationServiceType.Discord, locationAppointments,
+                appointmentLocation, userId)
         };
         await Task.WhenAll(notificationTasks);
     }
@@ -38,7 +35,8 @@ public class NotificationManagerService(
     }
 
     private async Task SendNotificationForService(NotificationServiceType serviceType,
-        LocationAppointmentWithDetailsDto locationAppointment, int userId)
+        List<LocationAppointmentDto> locationAppointments,
+        AppointmentLocationEntity locationInformation, int userId)
     {
         var service = GetNotificationInstanceForService(serviceType);
         if (service == null)
@@ -47,7 +45,7 @@ public class NotificationManagerService(
             return;
         }
 
-        await service.SendNotification(locationAppointment, userId);
+        await service.SendNotification(locationAppointments, locationInformation, userId);
     }
 
     private INotificationService? GetNotificationInstanceForService(

@@ -20,4 +20,18 @@ public class DiscordNotificationSettingsRepository(GlobalEntryTrackerDbContext c
         await context.SaveChangesAsync();
         return newSettings.Entity.Id;
     }
+
+    public async Task<int> UpdateNotificationSettingsForUser(
+        DiscordNotificationSettingsEntity entity)
+    {
+        var existingSettings = await context.DiscordNotificationSettings
+            .FirstOrDefaultAsync(x => x.UserId == entity.UserId);
+        if (existingSettings == null) throw new NullReferenceException("Settings not found");
+        if (existingSettings.UserId != entity.UserId)
+            throw new UnauthorizedAccessException(
+                "You are not authorized to update these notification settings.");
+        context.Entry(existingSettings).CurrentValues.SetValues(entity);
+        await context.SaveChangesAsync();
+        return existingSettings.Id;
+    }
 }

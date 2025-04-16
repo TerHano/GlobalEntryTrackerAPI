@@ -1,5 +1,4 @@
 using Business;
-using Business.Dto;
 using Business.Dto.NotificationSettings;
 using GlobalEntryTrackerAPI.Extensions;
 using GlobalEntryTrackerAPI.Models;
@@ -17,7 +16,7 @@ public static class NotificationSettingsEndpoints
                 var userId = httpContext.User.GetUserId();
 
                 var notificationCheck = await userBusiness.DoesUserHaveNotificationsSetUp(userId);
-                return Results.Ok(new ApiResponse<NotificationCheckDto>(notificationCheck));
+                return Results.Ok(notificationCheck);
             }).RequireAuthorization();
 
 
@@ -40,7 +39,19 @@ public static class NotificationSettingsEndpoints
                 var newSettingsId = await discordNotificationSettingsBusiness
                     .CreateDiscordNotificationSettingsForUser(newSettings, userId);
                 return Results.Ok(
-                    new ApiResponse<int>(newSettingsId));
+                    newSettingsId);
+            }).RequireAuthorization();
+
+        app.MapPut("/api/v1/notification-settings/discord",
+            async (DiscordNotificationSettingsDto updatedSettings,
+                HttpContext httpContext,
+                DiscordNotificationSettingsBusiness discordNotificationSettingsBusiness) =>
+            {
+                var userId = httpContext.User.GetUserId();
+                var newSettingsId = await discordNotificationSettingsBusiness
+                    .UpdateDiscordNotificationSettingsForUser(updatedSettings, userId);
+                return Results.Ok(
+                    newSettingsId);
             }).RequireAuthorization();
 
         app.MapPost("/api/v1/notification-settings/discord/test",
@@ -49,7 +60,7 @@ public static class NotificationSettingsEndpoints
             {
                 await discordNotificationSettingsBusiness
                     .SendDiscordTestMessage(testSettings);
-                return Results.Ok(new ApiResponse());
+                return Results.Ok();
             }).RequireAuthorization();
     }
 }

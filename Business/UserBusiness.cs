@@ -14,6 +14,21 @@ public class UserBusiness(UserRepository userRepository, IMapper mapper)
         await userRepository.CreateUser(newUser);
     }
 
+    public async Task UpdateUser(UpdateUserRequest request, int userId)
+    {
+        var user = await userRepository.GetUserById(userId);
+        if (user == null) throw new Exception("User not found");
+        mapper.Map(request, user);
+        await userRepository.UpdateUser(user);
+    }
+
+    public async Task<UserDto> GetUserById(int userId)
+    {
+        var user = await userRepository.GetUserById(userId);
+        return mapper.Map<UserDto>(user);
+    }
+
+
     public async Task<NotificationCheckDto> DoesUserHaveNotificationsSetUp(int userId)
     {
         var user = await userRepository.GetUserWithNotificationSettings(userId);

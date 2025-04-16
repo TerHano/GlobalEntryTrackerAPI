@@ -1,12 +1,14 @@
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using Business;
 using Business.Mappers;
 using Database;
 using Database.Repositories;
 using GlobalEntryTrackerAPI.Endpoints;
-using GlobalEntryTrackerAPI.Handlers;
+using GlobalEntryTrackerAPI.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Quartz;
@@ -27,7 +29,7 @@ builder.Services.AddCors(options =>
         {
             policy.AllowAnyMethod();
             policy.AllowAnyHeader();
-            policy.WithOrigins(allowedOrigins);
+            policy.WithOrigins(allowedOrigins.Split(","));
             policy.AllowCredentials();
         });
 });
@@ -53,18 +55,26 @@ builder.Services.AddScoped<NotificationBusiness>();
 builder.Services.AddScoped<UserBusiness>();
 builder.Services.AddScoped<DiscordNotificationSettingsBusiness>();
 builder.Services.AddScoped<NotificationManagerService>();
+builder.Services.AddScoped<NotificationDispatcherService>();
 
+builder.Services.AddScoped<UserAppointmentValidationService>();
 builder.Services.AddScoped<DiscordNotificationService>();
+builder.Services.AddScoped<JobService>();
+
 
 builder.Services.AddHttpClient();
-builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
+builder.Services.Configure<JsonOptions>(options =>
+{
+    options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+});
 
 
 // builder.Services.AddSingleton<IUserIdProvider, NameUserIdProvider>();
 
 //Mappers
 builder.Services.AddAutoMapper(typeof(AppointmentLocationMapper), typeof(NotificationTypeMapper),
-    typeof(UserMapper), typeof(DiscordNotificationSettingsMapper));
+    typeof(UserMapper), typeof(DiscordNotificationSettingsMapper), typeof(TrackLocationMapper));
 
 
 //Validators
@@ -151,12 +161,13 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddQuartz(q =>
 {
     // Use a dedicated thread pool for Quartz jobs.
-    // q.UseDedicatedThreadPool(tp => {
-    //     tp.MaxConcurrency = 10; // Adjust as needed
-    // });
+    q.UseDedicatedThreadPool(tp =>
+    {
+        tp.MaxConcurrency = 10; // Adjust as needed
+    });
     // // Configure Quartz options (optional)
-    // q.UseMicrosoftDependencyInjectionJobFactory();
-    // q.UseInMemoryStore();
+    //q.UseMicrosoftDependencyInjectionJobFactory();
+    q.UseInMemoryStore();
     //
     // // Register jobs and triggers here (see step 3)
     // // Example: Register a job and trigger to run every 5 seconds.
@@ -181,12 +192,16 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment()) app.MapOpenApi();
 
 app.UseHttpsRedirection();
+app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
+
+app.UseMiddleware<ApiResponseMiddleware>();
 
 app.MapLocationEndpoints();
 app.MapLocationTrackerEndpoints();
 app.MapNotificationEndpoints();
 app.MapAuthEndpoints();
 app.MapNotificationSettingsEndpoints();
+app.MapUserEndpoints();
 
 app.UseAuthentication();
 app.UseAuthorization();
