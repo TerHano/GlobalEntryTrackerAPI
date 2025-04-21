@@ -1,13 +1,10 @@
-using GlobalEntryTrackerAPI;
-
 namespace Business.Dto;
 
 public class TrackedLocationForUserDto
 {
     public int Id { get; set; }
-    public int LocationId { get; set; }
+    public AppointmentLocationDto Location { get; set; }
     public bool Enabled { get; set; }
-    public NotificationType NotificationType { get; set; }
-    public DateOnly StartDate { get; set; }
-    public DateOnly EndDate { get; set; }
+    public NotificationTypeDto NotificationType { get; set; }
+    public DateOnly CutOffDate { get; set; }
 }

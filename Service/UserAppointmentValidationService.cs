@@ -10,38 +10,56 @@ public class UserAppointmentValidationService
         List<LocationAppointmentDto> locationAppointments,
         TrackedLocationForUserEntity trackedLocationForUser)
     {
-        const int maxAppointmentToNotify = 5;
+        const int maxAppointmentsForDayToNotify = 3;
+        const int maxDaysToNotify = 5;
         var validLocationAppointments = new List<LocationAppointmentDto>();
         var notificationType = trackedLocationForUser.NotificationType.Type;
         switch (notificationType)
         {
-            case NotificationType.Before:
+            case NotificationType.Soonest:
             {
+                DateTime? lastSeenDate = null;
+                var locationsSeenForDate = 0;
+                var daysSeen = 0;
                 foreach (var locationAppointmentDto in locationAppointments)
                 {
+                    if (lastSeenDate == locationAppointmentDto.StartTimestamp.Date &&
+                        locationsSeenForDate >= maxAppointmentsForDayToNotify)
+                        continue;
+                    if (lastSeenDate != locationAppointmentDto.StartTimestamp.Date)
+                    {
+                        // Reset the counter for a new date
+                        locationsSeenForDate = 0;
+                        daysSeen++;
+                        if (daysSeen > maxDaysToNotify)
+                            break;
+                    }
+
+                    lastSeenDate = locationAppointmentDto.StartTimestamp.Date;
                     var locationAppointmentDate =
                         DateOnly.FromDateTime(locationAppointmentDto.StartTimestamp);
-                    if (locationAppointmentDate <= trackedLocationForUser.StartDate)
+                    if (locationAppointmentDate <= trackedLocationForUser.CutOffDate)
+                    {
                         validLocationAppointments.Add(locationAppointmentDto);
-                    if (validLocationAppointments.Count >= maxAppointmentToNotify) break;
+                        locationsSeenForDate++;
+                    }
                 }
 
                 break;
             }
-            case NotificationType.Between:
+            case NotificationType.Weekends:
             {
                 foreach (var locationAppointmentDto in locationAppointments)
                 {
-                    var locationAppointmentDate =
-                        DateOnly.FromDateTime(locationAppointmentDto.StartTimestamp);
-                    if (locationAppointmentDate >= trackedLocationForUser.StartDate &&
-                        locationAppointmentDate <= trackedLocationForUser.EndDate)
+                    if (locationAppointmentDto.StartTimestamp.DayOfWeek is DayOfWeek.Saturday
+                        or DayOfWeek.Sunday)
                         validLocationAppointments.Add(locationAppointmentDto);
-                    if (validLocationAppointments.Count >= maxAppointmentToNotify) break;
+
+                    if (validLocationAppointments.Count >= maxAppointmentsForDayToNotify) break;
                 }
+            }
 
                 break;
-            }
         }
 
         return validLocationAppointments;

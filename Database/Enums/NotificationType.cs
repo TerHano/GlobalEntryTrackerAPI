@@ -2,6 +2,6 @@ namespace GlobalEntryTrackerAPI;
 
 public enum NotificationType
 {
-    Before,
-    Between
+    Soonest,
+    Weekends
 }

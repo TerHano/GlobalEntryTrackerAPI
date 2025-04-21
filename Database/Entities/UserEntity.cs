@@ -18,5 +18,7 @@ public class UserEntity
     public required DateTime CreatedAt { get; init; }
 
     public int? DiscordNotificationSettingsId { get; init; }
+
     public DiscordNotificationSettingsEntity? DiscordNotificationSettings { get; init; }
+    public virtual UserRoleEntity UserRole { get; set; }
 }

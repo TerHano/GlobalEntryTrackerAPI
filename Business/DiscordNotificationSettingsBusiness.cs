@@ -1,9 +1,9 @@
 using AutoMapper;
 using Business.Dto.NotificationSettings;
+using Business.Dto.Requests;
 using Database.Entities.NotificationSettings;
 using Database.Repositories;
 using Service;
-using Service.Dto;
 using Service.Enum;
 
 namespace Business;
@@ -24,7 +24,7 @@ public class DiscordNotificationSettingsBusiness(
     }
 
     public async Task<int> CreateDiscordNotificationSettingsForUser(
-        DiscordNotificationSettingsDto settings, int userId)
+        CreateDiscordSettingsRequest settings, int userId)
     {
         var entity = mapper.Map<DiscordNotificationSettingsEntity>(settings);
         entity.UserId = userId;
@@ -34,7 +34,7 @@ public class DiscordNotificationSettingsBusiness(
     }
 
     public async Task<int> UpdateDiscordNotificationSettingsForUser(
-        DiscordNotificationSettingsDto settings, int userId)
+        UpdateDiscordSettingsRequest settings, int userId)
     {
         var entity = mapper.Map<DiscordNotificationSettingsEntity>(settings);
         entity.UserId = userId;
@@ -43,7 +43,7 @@ public class DiscordNotificationSettingsBusiness(
         return entityId;
     }
 
-    public async Task SendDiscordTestMessage(TestDiscordNotificationDto notificationSettings)
+    public async Task SendDiscordTestMessage(TestDiscordSettingsRequest notificationSettings)
     {
         await notificationManager.SendTestMessageForService(NotificationServiceType.Discord,
             notificationSettings);

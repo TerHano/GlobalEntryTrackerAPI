@@ -22,5 +22,13 @@ public static class LocationEndpoints
                 return Results.Created($"/locations/{appointmentLocationDto.Id}",
                     appointmentLocationDto);
             }).RequireAuthorization();
+
+        // GET: api/v1/location/states
+        app.MapGet("/api/v1/location/states",
+            async (AppointmentLocationBusiness appointmentLocationBusiness) =>
+            {
+                var states = await appointmentLocationBusiness.GetAllAppointmentStates();
+                return Results.Ok(states);
+            }).RequireAuthorization();
     }
 }

@@ -1,6 +1,8 @@
 using Business;
 using Business.Dto.Requests;
+using FluentValidation;
 using GlobalEntryTrackerAPI.Extensions;
+using GlobalEntryTrackerAPI.Validators;
 
 namespace GlobalEntryTrackerAPI.Endpoints;
 
@@ -31,6 +33,9 @@ public static class LocationTrackerEndpoints
                 HttpContext httpContext,
                 UserAppointmentTrackerBusiness userAppointmentTrackerBusiness) =>
             {
+                // Validate the request
+                var validator = new CreateTrackerForUserRequestValidator();
+                await validator.ValidateAndThrowAsync(request);
                 var userId = httpContext.User.GetUserId();
                 var createdId =
                     await userAppointmentTrackerBusiness.CreateTrackerForUser(request, userId);
@@ -42,6 +47,8 @@ public static class LocationTrackerEndpoints
                 HttpContext httpContext,
                 UserAppointmentTrackerBusiness userAppointmentTrackerBusiness) =>
             {
+                var validator = new UpdateTrackerForUserRequestValidator();
+                await validator.ValidateAndThrowAsync(request);
                 var userId = httpContext.User.GetUserId();
                 var updatedId =
                     await userAppointmentTrackerBusiness.UpdateTrackerForUser(request, userId);

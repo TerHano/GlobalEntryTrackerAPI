@@ -15,6 +15,15 @@ public class AppointmentLocationBusiness(
         return mapper.Map<List<AppointmentLocationDto>>(locations);
     }
 
+    //Get all appointment states sorted
+
+    public async Task<List<string>> GetAllAppointmentStates()
+    {
+        var states = await appointmentLocationRepository.GetAppointmentStates();
+        states.Sort();
+        return mapper.Map<List<string>>(states);
+    }
+
     public async Task<AppointmentLocationEntity> GetAppointmentLocationByExternalId(int id)
     {
         return await appointmentLocationRepository.GetAppointmentLocationByExternalId(id);

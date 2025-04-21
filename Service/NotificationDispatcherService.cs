@@ -1,3 +1,4 @@
+using Database.Entities;
 using Database.Repositories;
 using Service.Dto;
 
@@ -17,7 +18,8 @@ public class NotificationDispatcherService(
             await appointmentLocationRepository.GetAppointmentLocationByExternalId(externalId);
         if (locationInformation == null) throw new ApplicationException("No location found");
         var trackersForLocation =
-            trackedLocationForUserRepository.GetTrackersByLocationId(locationInformation.Id);
+            trackedLocationForUserRepository.GetTrackersByLocationIdDueForNotification(
+                locationInformation.Id);
 
         foreach (var trackedLocationForUser in trackersForLocation)
         {
@@ -29,5 +31,21 @@ public class NotificationDispatcherService(
                 validAppointments,
                 locationInformation, trackedLocationForUser.UserId);
         }
+
+        await UpdateNextNotificationTimeBasedOnRole(trackersForLocation);
+    }
+
+    private async Task UpdateNextNotificationTimeBasedOnRole(
+        List<TrackedLocationForUserEntity> trackers)
+    {
+        foreach (var trackedLocationForUser in trackers)
+        {
+            var userRoleIntervalInHours =
+                trackedLocationForUser.User.UserRole.Role.NotificationIntervalInMinutes;
+            trackedLocationForUser.NextNotificationAt =
+                trackedLocationForUser.NextNotificationAt.AddMinutes(userRoleIntervalInHours);
+        }
+
+        await trackedLocationForUserRepository.UpdateListOfTrackers(trackers);
     }
 }

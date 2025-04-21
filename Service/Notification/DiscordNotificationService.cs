@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using Business.Dto.Requests;
 using Database.Entities;
 using Database.Entities.NotificationSettings;
 using Database.Repositories;
@@ -35,14 +36,14 @@ public class DiscordNotificationService(
 
     public async Task SendTestNotification<T>(T settingsToTest)
     {
-        if (settingsToTest != null && settingsToTest is TestDiscordNotificationDto settings)
+        if (settingsToTest != null && settingsToTest is TestDiscordSettingsRequest settings)
         {
             var testMessage = GenerateTestMessage();
             await SendMessageThroughWebhook(settings, testMessage);
         }
         else
         {
-            logger.LogError("Settings passed is not of type TestDiscordNotificationDto");
+            logger.LogError("Settings passed is not of type TestDiscordSettingsRequest");
         }
     }
 
@@ -50,6 +51,10 @@ public class DiscordNotificationService(
         List<LocationAppointmentDto> appointments,
         AppointmentLocationEntity locationInformation)
     {
+        var groupedAppointments = appointments
+            .GroupBy(appointment => appointment.StartTimestamp.Date)
+            .ToDictionary(group => group.Key, group => group.ToList());
+
         var fields = new List<DiscordWebhookMessageDto.Field>
         {
             new()
@@ -58,12 +63,23 @@ public class DiscordNotificationService(
                 Value = locationInformation.Name
             }
         };
-        fields.AddRange(appointments.Select(locationAppointmentDto =>
-            new DiscordWebhookMessageDto.Field
+        foreach (var (date, appointmentList) in groupedAppointments)
+        {
+            var dateField = new DiscordWebhookMessageDto.Field
             {
-                Name = "Appointment",
-                Value = locationAppointmentDto.StartTimestamp.ToString("MMM dd, yyyy hh:mm tt")
-            }));
+                Name = date.ToString("MMM dd, yyyy"),
+                Value = string.Join(", ",
+                    appointmentList.Select(a => a.StartTimestamp.ToString("hh:mm tt")))
+            };
+            fields.Add(dateField);
+        }
+
+        // fields.AddRange(appointments.Select(locationAppointmentDto =>
+        //     new DiscordWebhookMessageDto.Field
+        //     {
+        //         Name = "Appointment",
+        //         Value = locationAppointmentDto.StartTimestamp.ToString("MMM dd, yyyy hh:mm tt")
+        //     }));
         return fields;
     }
 
@@ -77,7 +93,7 @@ public class DiscordNotificationService(
         if (response.StatusCode != HttpStatusCode.NoContent) throw new Exception();
     }
 
-    private async Task SendMessageThroughWebhook(TestDiscordNotificationDto settings,
+    private async Task SendMessageThroughWebhook(TestDiscordSettingsRequest settings,
         DiscordWebhookMessageDto message)
     {
         var options = new JsonSerializerOptions
@@ -120,7 +136,7 @@ public class DiscordNotificationService(
             [
                 new DiscordWebhookMessageDto.Embed
                 {
-                    Title = "New Appointment Available",
+                    Title = "New Appointment(s) Available",
                     Description =
                         "Click [here](https://ttp.cbp.dhs.gov/dashboard) to schedule your appointment",
                     Color = 16761600,

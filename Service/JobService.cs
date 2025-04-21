@@ -24,7 +24,7 @@ public class JobService(
                 .Build();
 
             var trigger = TriggerBuilder.Create()
-                .WithIdentity("5min", "LocationTrackers")
+                .WithIdentity(GetTriggerKey(locationId))
                 .StartNow()
                 .WithSimpleSchedule(x => x
                     .WithIntervalInMinutes(5)
@@ -39,5 +39,10 @@ public class JobService(
     private static JobKey GetJobKey(int locationId)
     {
         return new JobKey($"Job-{locationId}", "LocationTrackers");
+    }
+
+    private static TriggerKey GetTriggerKey(int locationId)
+    {
+        return new TriggerKey("5min", $"Trigger-{locationId}");
     }
 }

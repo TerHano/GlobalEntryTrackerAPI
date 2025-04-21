@@ -10,6 +10,14 @@ public class AppointmentLocationRepository(GlobalEntryTrackerDbContext context)
         return await context.AppointmentLocations.ToListAsync();
     }
 
+    public async Task<List<string>> GetAppointmentStates()
+    {
+        return await context.AppointmentLocations
+            .Select(x => x.State)
+            .Distinct()
+            .ToListAsync();
+    }
+
     public async Task<AppointmentLocationEntity> GetAppointmentLocationByExternalId(int id)
     {
         var appointmentLocation = await context.AppointmentLocations

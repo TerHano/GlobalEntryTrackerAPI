@@ -1,17 +1,29 @@
 using AutoMapper;
 using Business.Dto;
+using Business.Dto.NotificationSettings;
 using Business.Dto.Requests;
 using Database.Entities;
+using Database.Enums;
 using Database.Repositories;
 
 namespace Business;
 
-public class UserBusiness(UserRepository userRepository, IMapper mapper)
+public class UserBusiness(
+    TrackedLocationForUserRepository trackedLocationRepository,
+    UserRepository userRepository,
+    UserRoleRepository userRoleRepository,
+    IMapper mapper)
 {
     public async Task CreateUser(CreateUserRequest request)
     {
         var newUser = mapper.Map<UserEntity>(request);
         await userRepository.CreateUser(newUser);
+        var newUserRole = new UserRoleEntity
+        {
+            UserId = newUser.Id,
+            RoleId = (int)Role.Free
+        };
+        await userRoleRepository.CreateUserRole(newUserRole);
     }
 
     public async Task UpdateUser(UpdateUserRequest request, int userId)
@@ -28,6 +40,29 @@ public class UserBusiness(UserRepository userRepository, IMapper mapper)
         return mapper.Map<UserDto>(user);
     }
 
+    public async Task AssignRoleForUser(int userId, Role role)
+    {
+        var newUserRole = new UserRoleEntity
+        {
+            UserId = userId,
+            RoleId = (int)role
+        };
+        await userRoleRepository.CreateUserRole(newUserRole);
+    }
+
+    public async Task<PermissionsDto> GetPermissionsForUser(int userId)
+    {
+        var trackersForUser = await trackedLocationRepository.GetTrackedLocationsForUser(userId);
+        var numOfTrackers = trackersForUser.Count;
+        var user = await userRepository.GetUserById(userId);
+        var maxTrackers = user.UserRole.Role.MaxTrackers;
+        var permissions = new PermissionsDto
+        {
+            CanCreateTracker = numOfTrackers < maxTrackers
+        };
+        return permissions;
+    }
+
 
     public async Task<NotificationCheckDto> DoesUserHaveNotificationsSetUp(int userId)
     {
@@ -41,5 +76,16 @@ public class UserBusiness(UserRepository userRepository, IMapper mapper)
             IsNotificationsSetUp = isNotificationsSetUp,
             isAnyNotificationsEnabled = isAnyNotificationsEnabled
         };
+    }
+
+    public async Task<UserNotificationSettingsDto> GetAllNotificationsForUser(int userId)
+    {
+        var user = await userRepository.GetUserWithNotificationSettings(userId);
+        var userNotificationSettingsDto = new UserNotificationSettingsDto
+        {
+            DiscordSettings =
+                mapper.Map<DiscordNotificationSettingsDto>(user.DiscordNotificationSettings)
+        };
+        return userNotificationSettingsDto;
     }
 }

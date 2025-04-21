@@ -41,11 +41,13 @@ if (string.IsNullOrEmpty(connectionString)) throw new Exception("ConnectionStrin
 builder.Services.AddDbContextPool<GlobalEntryTrackerDbContext>(opt =>
     opt.UseNpgsql(connectionString));
 
+
 builder.Services.AddScoped<AppointmentLocationRepository>();
 builder.Services.AddScoped<TrackedLocationForUserRepository>();
 builder.Services.AddScoped<NotificationTypeRepository>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<DiscordNotificationSettingsRepository>();
+builder.Services.AddScoped<UserRoleRepository>();
 
 
 //builder.Services.AddScoped<JwtService>();
@@ -73,16 +75,13 @@ builder.Services.Configure<JsonOptions>(options =>
 // builder.Services.AddSingleton<IUserIdProvider, NameUserIdProvider>();
 
 //Mappers
-builder.Services.AddAutoMapper(typeof(AppointmentLocationMapper), typeof(NotificationTypeMapper),
-    typeof(UserMapper), typeof(DiscordNotificationSettingsMapper), typeof(TrackLocationMapper));
+
+builder.Services.AddAutoMapper(typeof(UserMapper).Assembly);
 
 
 //Validators
 //builder.Services.AddScoped<IValidator<PlayerDTO>, PlayerDTOValidator>();
 //builder.Services.AddScoped<IValidator<UpdateRoleSettingsRequest>, RoleSettingsRequestValidator>();
-
-
-//builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 
 // Add services to the container.
@@ -192,7 +191,7 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment()) app.MapOpenApi();
 
 app.UseHttpsRedirection();
-app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
+//app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 
 app.UseMiddleware<ApiResponseMiddleware>();
 

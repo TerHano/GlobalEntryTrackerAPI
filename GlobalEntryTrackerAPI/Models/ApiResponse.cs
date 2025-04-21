@@ -1,20 +1,23 @@
-// namespace GlobalEntryTrackerAPI.Models;
-//
-// public class ApiResponse
-// {
-//     public ApiResponse()
-//     {
-//         Success = true;
-//         ErrorMessage = string.Empty;
-//     }
-//
-//     public ApiResponse(string errorMessage)
-//     {
-//         Success = false;
-//         ErrorMessage = errorMessage;
-//     }
-//
-//     public bool Success { get; set; }
-//     public string ErrorMessage { get; set; }
-// }
+namespace GlobalEntryTrackerAPI.Models;
 
+public class ApiResponse<T>
+{
+    public ApiResponse()
+    {
+        Success = true;
+        ErrorMessages = [];
+    }
+
+
+    public ApiResponse(T data)
+    {
+        Success = true;
+        Data = data;
+        ErrorMessages = [];
+    }
+
+
+    public bool Success { get; set; } = true;
+    public string[] ErrorMessages { get; set; }
+    public T? Data { get; set; }
+}

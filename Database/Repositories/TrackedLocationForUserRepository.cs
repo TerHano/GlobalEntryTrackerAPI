@@ -5,16 +5,13 @@ namespace Database.Repositories;
 
 public class TrackedLocationForUserRepository(GlobalEntryTrackerDbContext context)
 {
-    public async Task<TrackedLocationForUserEntity> GetTrackerById(int trackerId, int userId)
+    public async Task<TrackedLocationForUserEntity> GetTrackerById(int trackerId)
     {
         var trackedLocation = await context.UserTrackedLocations
             .Include(x => x.Location)
             .Include(x => x.NotificationType)
             .FirstOrDefaultAsync(x => x.Id == trackerId);
         if (trackedLocation == null) throw new NullReferenceException("Tracker not found");
-        if (trackedLocation.UserId != userId)
-            throw new UnauthorizedAccessException(
-                "You are not authorized to access this tracked location.");
         return trackedLocation;
     }
 
@@ -24,9 +21,22 @@ public class TrackedLocationForUserRepository(GlobalEntryTrackerDbContext contex
             .Include(x => x.Location).Where(x => x.LocationId == locationId).ToList();
     }
 
+    public List<TrackedLocationForUserEntity> GetTrackersByLocationIdDueForNotification(
+        int locationId)
+    {
+        var now = DateTime.UtcNow;
+        return context.UserTrackedLocations.Include(x => x.NotificationType)
+            .Include(x => x.Location)
+            .Include(x => x.User)
+            .ThenInclude(x => x.UserRole)
+            .ThenInclude(x => x.Role)
+            .Where(x => x.LocationId == locationId && x.NextNotificationAt <= now).ToList();
+    }
+
     public async Task<List<TrackedLocationForUserEntity>> GetTrackedLocationsForUser(int userId)
     {
-        return await context.UserTrackedLocations.Where(x => x.UserId == userId).ToListAsync();
+        return await context.UserTrackedLocations.Include(x => x.NotificationType)
+            .Include(x => x.Location).Where(x => x.UserId == userId).ToListAsync();
     }
 
     public async Task<int> CreateTrackerForUser(TrackedLocationForUserEntity trackedLocationForUser)
@@ -38,14 +48,23 @@ public class TrackedLocationForUserRepository(GlobalEntryTrackerDbContext contex
 
     public async Task<int> UpdateTrackerForUser(TrackedLocationForUserEntity trackedLocationForUser)
     {
-        var entity = await context.UserTrackedLocations.FindAsync(trackedLocationForUser.Id);
-        if (entity == null) throw new NullReferenceException("Tracker not found");
-        if (entity.UserId != trackedLocationForUser.UserId)
-            throw new UnauthorizedAccessException(
-                "You are not authorized to update this tracked location.");
-        var updatedEntity = context.Update(trackedLocationForUser);
+        var entity = context.Update(trackedLocationForUser);
         await context.SaveChangesAsync();
-        return updatedEntity.Entity.Id;
+        return entity.Entity.Id;
+    }
+
+    public async Task<List<int>> UpdateListOfTrackers(
+        List<TrackedLocationForUserEntity> trackedLocationsForUser)
+    {
+        var updatedTrackers = new List<int>();
+        foreach (var trackedLocationForUser in trackedLocationsForUser)
+        {
+            var entity = context.Update(trackedLocationForUser);
+            updatedTrackers.Add(entity.Entity.Id);
+        }
+
+        await context.SaveChangesAsync();
+        return updatedTrackers;
     }
 
     public async Task<int> DeleteTrackerForUser(int trackerId, int userId)

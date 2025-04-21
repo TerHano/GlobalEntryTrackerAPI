@@ -1,17 +1,17 @@
+using System.Net;
 using System.Text.Json;
+using FluentValidation;
 using GlobalEntryTrackerAPI.Models;
 
-public class ApiResponseMiddleware
+namespace GlobalEntryTrackerAPI.Middleware;
+
+public class ApiResponseMiddleware(RequestDelegate next)
 {
-    private readonly RequestDelegate _next;
-
-    public ApiResponseMiddleware(RequestDelegate next)
-    {
-        _next = next;
-    }
-
     public async Task InvokeAsync(HttpContext context)
     {
+        if (context.Response.HasStarted)
+            // If the response has already started, skip further processing
+            return;
         var originalBodyStream = context.Response.Body;
         using var responseBody = new MemoryStream();
         context.Response.Body = responseBody;
@@ -24,7 +24,7 @@ public class ApiResponseMiddleware
 
         try
         {
-            await _next(context);
+            await next(context);
 
             context.Response.Body = originalBodyStream;
             if (context.Response.StatusCode is >= 200 and < 300)
@@ -38,7 +38,6 @@ public class ApiResponseMiddleware
                 if (string.IsNullOrWhiteSpace(bodyText))
                 {
                     // Handle empty or null response
-                    var x = new ApiResponse<object>();
                     wrappedResponseJson =
                         JsonSerializer.Serialize(new ApiResponse<object>(), options);
                 }
@@ -62,10 +61,37 @@ public class ApiResponseMiddleware
         }
         catch (Exception ex)
         {
-            context.Response.Body = originalBodyStream;
-            var errorResponse = new ApiResponse<string>(ex.Message);
-            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-            await context.Response.WriteAsJsonAsync(errorResponse);
+            if (!context.Response.HasStarted)
+            {
+                context.Response.Body = originalBodyStream;
+
+                ApiResponse<object?> response;
+                if (ex is ValidationException validationException)
+                {
+                    var errors = validationException.Errors
+                        .Select(e => e.ErrorMessage)
+                        .ToList();
+                    response = new ApiResponse<object?>
+                    {
+                        Success = false,
+                        ErrorMessages = errors.ToArray()
+                    };
+                }
+                else
+                {
+                    response = new ApiResponse<object?>
+                    {
+                        Success = false,
+                        ErrorMessages = ["An unexpected error occurred."]
+                    };
+                }
+
+                context.Response.ContentType = "application/json";
+                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+
+                var responseJson = JsonSerializer.Serialize(response, options);
+                await context.Response.WriteAsync(responseJson);
+            }
         }
     }
 }

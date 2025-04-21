@@ -3,6 +3,7 @@ using System;
 using Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Database.Migrations
 {
     [DbContext(typeof(GlobalEntryTrackerDbContext))]
-    partial class GlobalEntryTrackerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250421022946_User Roles")]
+    partial class UserRoles
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -128,15 +131,9 @@ namespace Database.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("MaxTrackers")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<int>("NotificationIntervalInMinutes")
-                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -246,8 +243,7 @@ namespace Database.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.HasIndex("UserId")
-                        .IsUnique();
+                    b.HasIndex("UserId");
 
                     b.ToTable("UserRoles");
                 });
@@ -297,8 +293,8 @@ namespace Database.Migrations
                         .IsRequired();
 
                     b.HasOne("Database.Entities.UserEntity", "User")
-                        .WithOne("UserRole")
-                        .HasForeignKey("Database.Entities.UserRoleEntity", "UserId")
+                        .WithMany("UserRoles")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -315,8 +311,7 @@ namespace Database.Migrations
 
             modelBuilder.Entity("Database.Entities.UserEntity", b =>
                 {
-                    b.Navigation("UserRole")
-                        .IsRequired();
+                    b.Navigation("UserRoles");
                 });
 #pragma warning restore 612, 618
         }
