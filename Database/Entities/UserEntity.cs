@@ -21,4 +21,6 @@ public class UserEntity
 
     public DiscordNotificationSettingsEntity? DiscordNotificationSettings { get; init; }
     public virtual List<UserRoleEntity> UserRoles { get; set; }
+
+    public required DateTime NextNotificationAt { get; set; }
 }

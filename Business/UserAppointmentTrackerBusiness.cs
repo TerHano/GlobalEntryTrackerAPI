@@ -12,6 +12,7 @@ namespace Business;
 public class UserAppointmentTrackerBusiness(
     TrackedLocationForUserRepository trackedLocationForUserRepository,
     UserRepository userRepository,
+    UserRoleService userRoleService,
     JobService jobService,
     IMapper mapper,
     ILogger<UserAppointmentTrackerBusiness> logger)
@@ -38,7 +39,7 @@ public class UserAppointmentTrackerBusiness(
     public async Task<int> CreateTrackerForUser(CreateTrackerForUserRequest request, int userId)
     {
         var user = await userRepository.GetUserById(userId);
-        var maxTrackers = user.UserRoles.Max(r => r.Role.MaxTrackers);
+        var maxTrackers = userRoleService.GetAllowedNumberOfTrackersForUser(user);
         var trackedLocationsForUser =
             await trackedLocationForUserRepository.GetTrackedLocationsForUser(userId);
         if (await DoesUserAlreadyHaveTrackerForLocationAndNotificationType(
@@ -56,7 +57,6 @@ public class UserAppointmentTrackerBusiness(
             UserId = userId,
             Enabled = true,
             CutOffDate = request.CutOffDate,
-            NextNotificationAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -89,6 +89,17 @@ public class UserAppointmentTrackerBusiness(
                 "You already have a tracker for this location and notification type.");
         var entity = mapper.Map(request, trackedLocation);
         entity.UpdatedAt = DateTime.UtcNow;
+        try
+        {
+            await jobService.StartTrackingAppointmentLocation(request.LocationId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex.Message);
+            throw new ApplicationException(
+                "Error updating tracker, please try again later");
+        }
+
         return await trackedLocationForUserRepository.UpdateTrackerForUser(entity);
     }
 

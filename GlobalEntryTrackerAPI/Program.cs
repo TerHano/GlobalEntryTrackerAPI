@@ -53,6 +53,7 @@ builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<DiscordNotificationSettingsRepository>();
 builder.Services.AddScoped<UserRoleRepository>();
 builder.Services.AddScoped<UserCustomerRepository>();
+builder.Services.AddScoped<PlanOptionRepository>();
 
 
 //builder.Services.AddScoped<JwtService>();
@@ -64,10 +65,12 @@ builder.Services.AddScoped<DiscordNotificationSettingsBusiness>();
 builder.Services.AddScoped<NotificationManagerService>();
 builder.Services.AddScoped<NotificationDispatcherService>();
 builder.Services.AddScoped<SubscriptionBusiness>();
+builder.Services.AddScoped<PlanBusiness>();
 
 builder.Services.AddScoped<UserAppointmentValidationService>();
 builder.Services.AddScoped<DiscordNotificationService>();
 builder.Services.AddScoped<JobService>();
+builder.Services.AddScoped<UserRoleService>();
 
 
 builder.Services.AddHttpClient();

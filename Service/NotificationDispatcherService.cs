@@ -7,7 +7,9 @@ namespace Service;
 public class NotificationDispatcherService(
     NotificationManagerService notificationManagerService,
     UserAppointmentValidationService userAppointmentValidationService,
+    UserRoleService userRoleService,
     TrackedLocationForUserRepository trackedLocationForUserRepository,
+    UserRepository userRepository,
     AppointmentLocationRepository appointmentLocationRepository)
 {
     //Create method that checks if a list of appointments is valid for each user tracking the location and then send a notification
@@ -38,15 +40,15 @@ public class NotificationDispatcherService(
     private async Task UpdateNextNotificationTimeBasedOnRole(
         List<TrackedLocationForUserEntity> trackers)
     {
-        foreach (var trackedLocationForUser in trackers)
+        var users = trackers.Select(x => x.User).Distinct().ToList();
+        foreach (var user in users)
         {
             var userRoleIntervalInMinutes =
-                trackedLocationForUser.User.UserRoles.Max(r =>
-                    r.Role.NotificationIntervalInMinutes);
-            trackedLocationForUser.NextNotificationAt =
-                trackedLocationForUser.NextNotificationAt.AddMinutes(userRoleIntervalInMinutes);
+                userRoleService.GetNextNotificationTimeForUser(user);
+            user.NextNotificationAt =
+                DateTime.UtcNow.AddMinutes(userRoleIntervalInMinutes);
         }
 
-        await trackedLocationForUserRepository.UpdateListOfTrackers(trackers);
+        await userRepository.UpdateMultipleUsers(users);
     }
 }

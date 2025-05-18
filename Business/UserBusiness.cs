@@ -5,6 +5,7 @@ using Business.Dto.Requests;
 using Database.Entities;
 using Database.Enums;
 using Database.Repositories;
+using Service;
 
 namespace Business;
 
@@ -12,6 +13,7 @@ public class UserBusiness(
     TrackedLocationForUserRepository trackedLocationRepository,
     UserRepository userRepository,
     UserRoleRepository userRoleRepository,
+    UserRoleService userRoleService,
     IMapper mapper)
 {
     public async Task CreateUser(CreateUserRequest request)
@@ -55,7 +57,7 @@ public class UserBusiness(
         var trackersForUser = await trackedLocationRepository.GetTrackedLocationsForUser(userId);
         var numOfTrackers = trackersForUser.Count;
         var user = await userRepository.GetUserById(userId);
-        var maxTrackers = user.UserRoles.Max(r => r.Role.MaxTrackers);
+        var maxTrackers = userRoleService.GetAllowedNumberOfTrackersForUser(user);
         var permissions = new PermissionsDto
         {
             CanCreateTracker = numOfTrackers < maxTrackers

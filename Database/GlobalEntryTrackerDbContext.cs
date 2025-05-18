@@ -18,6 +18,8 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
 
     public DbSet<UserCustomerEntity> UserCustomers { get; set; }
 
+    public DbSet<PlanOptionEntity> PlanOptions { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AppointmentLocationEntity>()
@@ -37,6 +39,9 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
             .HasOne(e => e.DiscordNotificationSettings)
             .WithOne(e => e.User)
             .HasForeignKey<UserEntity>(e => e.DiscordNotificationSettingsId);
+
+        modelBuilder.Entity<UserEntity>().Property(u => u.NextNotificationAt)
+            .HasDefaultValue(DateTime.UtcNow);
 
         modelBuilder.Entity<UserRoleEntity>()
             .HasOne(e => e.User)

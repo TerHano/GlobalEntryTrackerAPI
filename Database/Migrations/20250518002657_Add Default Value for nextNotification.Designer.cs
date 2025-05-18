@@ -3,6 +3,7 @@ using System;
 using Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Database.Migrations
 {
     [DbContext(typeof(GlobalEntryTrackerDbContext))]
-    partial class GlobalEntryTrackerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250518002657_Add Default Value for nextNotification")]
+    partial class AddDefaultValuefornextNotification
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -118,46 +121,6 @@ namespace Database.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("NotificationTypes");
-                });
-
-            modelBuilder.Entity("Database.Entities.PlanOptionEntity", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
-
-                    b.Property<int>("DiscountedPrice")
-                        .HasColumnType("integer");
-
-                    b.PrimitiveCollection<string[]>("Features")
-                        .IsRequired()
-                        .HasColumnType("text[]");
-
-                    b.Property<int>("Frequency")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("Price")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("PriceId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("PlanOptions");
                 });
 
             modelBuilder.Entity("Database.Entities.RoleEntity", b =>
@@ -287,7 +250,7 @@ namespace Database.Migrations
                     b.Property<DateTime>("NextNotificationAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValue(new DateTime(2025, 5, 18, 1, 53, 10, 979, DateTimeKind.Utc).AddTicks(850));
+                        .HasDefaultValue(new DateTime(2025, 5, 18, 0, 26, 56, 807, DateTimeKind.Utc).AddTicks(8330));
 
                     b.HasKey("Id");
 

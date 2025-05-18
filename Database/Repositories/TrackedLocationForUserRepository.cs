@@ -30,7 +30,7 @@ public class TrackedLocationForUserRepository(GlobalEntryTrackerDbContext contex
             .Include(x => x.User)
             .ThenInclude(x => x.UserRoles)
             .ThenInclude(x => x.Role)
-            .Where(x => x.LocationId == locationId && x.NextNotificationAt <= now).ToList();
+            .Where(x => x.LocationId == locationId && x.User.NextNotificationAt < now).ToList();
     }
 
     public async Task<List<TrackedLocationForUserEntity>> GetTrackedLocationsForUser(int userId)

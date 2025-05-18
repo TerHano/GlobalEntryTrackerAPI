@@ -14,5 +14,4 @@ public class TrackedLocationForUserEntity
 
     public required DateTime CreatedAt { get; set; }
     public required DateTime UpdatedAt { get; set; }
-    public required DateTime NextNotificationAt { get; set; }
 }

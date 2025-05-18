@@ -12,23 +12,24 @@ namespace Business;
 public class SubscriptionBusiness(
     UserCustomerRepository userCustomerRepository,
     UserRoleRepository userRoleRepository,
+    UserRepository userRepository,
     ILogger<SubscriptionBusiness> logger)
 {
     public async Task<string> GetSubscriptionPaymentUrl(int userId,
         CreateCheckoutSessionRequest request)
     {
+        if (request.PriceId == null) throw new Exception("Price Id is required");
         var options = new SessionCreateOptions
         {
             LineItems =
             [
                 new SessionLineItemOptions
                 {
-                    // Provide the exact Price ID (for example, price_1234) of the product you want to sell
-                    Price = "price_1RPXk2Gf0lE9KRaJ0pdDawKN",
+                    Price = request.PriceId,
                     Quantity = 1
                 }
             ],
-            CustomerCreation = "always",
+
             Mode = "subscription",
             AllowPromotionCodes = true,
             SuccessUrl = request.SuccessUrl,
@@ -140,48 +141,67 @@ public class SubscriptionBusiness(
         {
             var stripeEvent =
                 EventUtility.ConstructEvent(jsonBody, stripeSignature, stripeWebhookSecret);
-            if (stripeEvent.Type == EventTypes.CustomerSubscriptionCreated)
+            switch (stripeEvent.Type)
             {
-                if (stripeEvent.Data.Object is not Subscription subscriptionEvent)
+                case EventTypes.CustomerSubscriptionCreated:
                 {
-                    logger.LogError("Subscription event is null");
-                    throw new NullReferenceException("Subscription event is null");
-                }
+                    if (stripeEvent.Data.Object is not Subscription subscriptionEvent)
+                    {
+                        logger.LogError("Subscription event is null");
+                        throw new NullReferenceException("Subscription event is null");
+                    }
 
-                var userId = subscriptionEvent.Metadata["userId"];
-                if (userId == null)
-                {
-                    logger.LogError("UserId not found in subscription metadata");
-                    throw new NullReferenceException("UserId not found in subscription metadata");
-                }
+                    var userId = subscriptionEvent.Metadata["userId"];
+                    if (userId == null)
+                    {
+                        logger.LogError("UserId not found in subscription metadata");
+                        throw new NullReferenceException(
+                            "UserId not found in subscription metadata");
+                    }
 
-                var userIdInt = int.Parse(userId);
-                var userCustomer = new UserCustomerEntity
-                {
-                    UserId = userIdInt,
-                    SubscriptionId = subscriptionEvent.Id,
-                    CustomerId = subscriptionEvent.CustomerId
-                };
-                await userRoleRepository.AddRoleForUser(userIdInt, Role.Subscriber);
-                await userCustomerRepository.AddUpdateUserCustomer(userCustomer);
-            }
-            else if (stripeEvent.Type == EventTypes.CustomerSubscriptionDeleted)
-            {
-                if (stripeEvent.Data.Object is not Subscription subscriptionEvent)
-                {
-                    logger.LogError("Subscription event is null");
-                    throw new NullReferenceException("Subscription event is null");
-                }
+                    var userIdInt = int.Parse(userId);
+                    var userCustomer = new UserCustomerEntity
+                    {
+                        UserId = userIdInt,
+                        SubscriptionId = subscriptionEvent.Id,
+                        CustomerId = subscriptionEvent.CustomerId
+                    };
+                    await userRoleRepository.AddRoleForUser(userIdInt, Role.Subscriber);
+                    await userCustomerRepository.AddUpdateUserCustomer(userCustomer);
 
-                var userId = subscriptionEvent.Metadata["userId"];
-                if (userId == null)
-                {
-                    logger.LogError("UserId not found in subscription metadata");
-                    throw new NullReferenceException("UserId not found in subscription metadata");
-                }
+                    //Move up users next notification date
+                    var user = await userRepository.GetUserById(userIdInt);
+                    if (user == null)
+                    {
+                        logger.LogError("User not found");
+                        throw new NullReferenceException("User not found");
+                    }
 
-                var userIdInt = int.Parse(userId);
-                await userRoleRepository.RemoveRoleForUser(userIdInt, Role.Subscriber);
+                    user.NextNotificationAt = user.NextNotificationAt.AddMinutes(
+                        user.UserRoles.Min(r => r.Role.NotificationIntervalInMinutes));
+                    await userRepository.UpdateUser(user);
+                    break;
+                }
+                case EventTypes.CustomerSubscriptionDeleted:
+                {
+                    if (stripeEvent.Data.Object is not Subscription subscriptionEvent)
+                    {
+                        logger.LogError("Subscription event is null");
+                        throw new NullReferenceException("Subscription event is null");
+                    }
+
+                    var userId = subscriptionEvent.Metadata["userId"];
+                    if (userId == null)
+                    {
+                        logger.LogError("UserId not found in subscription metadata");
+                        throw new NullReferenceException(
+                            "UserId not found in subscription metadata");
+                    }
+
+                    var userIdInt = int.Parse(userId);
+                    await userRoleRepository.RemoveRoleForUser(userIdInt, Role.Subscriber);
+                    break;
+                }
             }
         }
         catch (Exception ex)

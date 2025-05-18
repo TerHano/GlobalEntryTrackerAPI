@@ -32,4 +32,12 @@ public class UserRepository(GlobalEntryTrackerDbContext context)
         if (user is null) throw new NullReferenceException("User does not exist");
         return user;
     }
+
+    public async Task UpdateMultipleUsers(
+        List<UserEntity> users)
+    {
+        foreach (var user in users) context.Users.Update(user);
+
+        await context.SaveChangesAsync();
+    }
 }

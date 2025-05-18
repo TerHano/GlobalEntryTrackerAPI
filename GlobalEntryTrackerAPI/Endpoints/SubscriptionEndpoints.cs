@@ -8,6 +8,14 @@ public static class SubscriptionEndpoints
 {
     public static void MapSubscriptionEndpoints(this WebApplication app)
     {
+        app.MapGet("/api/v1/plans",
+            async (PlanBusiness planBusiness) =>
+            {
+                var plans = await planBusiness.GetPlanOptions();
+                return Results.Ok(plans);
+            });
+
+
         app.MapPost("/api/v1/subscribe",
             async (HttpContext httpContext,
                 SubscriptionBusiness subscriptionBusiness,
