@@ -27,7 +27,11 @@ public class UserBusiness(
         await supabase.InitializeAsync();
         var signUpOptions = new SignUpOptions
         {
-            RedirectTo = request.RedirectUrl
+            RedirectTo = request.RedirectUrl,
+            Data = new Dictionary<string, object>
+            {
+                { "first_name", request.FirstName }
+            }
         };
         var response = await supabase.Auth.SignUp(request.Email, request.Password, signUpOptions);
         var supabaseUser = response?.User;
