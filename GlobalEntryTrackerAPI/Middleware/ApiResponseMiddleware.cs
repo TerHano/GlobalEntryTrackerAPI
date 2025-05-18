@@ -1,11 +1,12 @@
 using System.Net;
 using System.Text.Json;
 using FluentValidation;
+using GlobalEntryTrackerAPI.Exceptions;
 using GlobalEntryTrackerAPI.Models;
 
 namespace GlobalEntryTrackerAPI.Middleware;
 
-public class ApiResponseMiddleware(RequestDelegate next)
+public class ApiResponseMiddleware(RequestDelegate next, ILogger<ApiResponseMiddleware> logger)
 {
     public async Task InvokeAsync(HttpContext context)
     {
@@ -74,22 +75,54 @@ public class ApiResponseMiddleware(RequestDelegate next)
                     response = new ApiResponse<object?>
                     {
                         Success = false,
-                        ErrorMessages = errors.ToArray()
+                        Errors = errors.Select<string, Error>(e =>
+                        {
+                            return new Error
+                            {
+                                Code = 0,
+                                Message = e
+                            };
+                        }).ToList()
                     };
+                    context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+                }
+                else if (ex is BaseApplicationException baseApplicationException)
+                {
+                    response = new ApiResponse<object?>
+                    {
+                        Success = false,
+                        Errors =
+                        [
+                            new Error
+                            {
+                                Code = baseApplicationException.ErrorCode,
+                                Message = baseApplicationException.Message
+                            }
+                        ]
+                    };
+                    context.Response.StatusCode = (int)HttpStatusCode.Conflict;
                 }
                 else
                 {
                     response = new ApiResponse<object?>
                     {
                         Success = false,
-                        ErrorMessages = ["An unexpected error occurred."]
+                        Errors =
+                        [
+                            new Error
+                            {
+                                Code = 0,
+                                Message = "An unexpected error occurred."
+                            }
+                        ]
                     };
+                    context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
                 }
 
                 context.Response.ContentType = "application/json";
-                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
 
                 var responseJson = JsonSerializer.Serialize(response, options);
+                logger.LogError(ex, "An error occurred while processing the request.");
                 await context.Response.WriteAsync(responseJson);
             }
         }

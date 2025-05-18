@@ -55,7 +55,7 @@ public class UserBusiness(
         var trackersForUser = await trackedLocationRepository.GetTrackedLocationsForUser(userId);
         var numOfTrackers = trackersForUser.Count;
         var user = await userRepository.GetUserById(userId);
-        var maxTrackers = user.UserRole.Role.MaxTrackers;
+        var maxTrackers = user.UserRoles.Max(r => r.Role.MaxTrackers);
         var permissions = new PermissionsDto
         {
             CanCreateTracker = numOfTrackers < maxTrackers

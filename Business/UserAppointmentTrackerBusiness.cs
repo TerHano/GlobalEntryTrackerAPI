@@ -3,6 +3,7 @@ using Business.Dto;
 using Business.Dto.Requests;
 using Database.Entities;
 using Database.Repositories;
+using GlobalEntryTrackerAPI.Exceptions;
 using Microsoft.Extensions.Logging;
 using Service;
 
@@ -37,9 +38,13 @@ public class UserAppointmentTrackerBusiness(
     public async Task<int> CreateTrackerForUser(CreateTrackerForUserRequest request, int userId)
     {
         var user = await userRepository.GetUserById(userId);
-        var maxTrackers = user.UserRole.Role.MaxTrackers;
+        var maxTrackers = user.UserRoles.Max(r => r.Role.MaxTrackers);
         var trackedLocationsForUser =
             await trackedLocationForUserRepository.GetTrackedLocationsForUser(userId);
+        if (await DoesUserAlreadyHaveTrackerForLocationAndNotificationType(
+                userId, request.LocationId, request.NotificationTypeId))
+            throw new TrackerForLocationAndTypeExistsException(
+                "You already have a tracker for this location and notification type.");
         if (trackedLocationsForUser.Count >= maxTrackers)
             throw new ApplicationException(
                 $"You have reached the maximum number of trackers ({maxTrackers}) for your role.");
@@ -78,6 +83,10 @@ public class UserAppointmentTrackerBusiness(
         if (trackedLocation.UserId != userId)
             throw new UnauthorizedAccessException(
                 "You are not authorized to access this tracked location.");
+        if (await DoesUserAlreadyHaveTrackerForLocationAndNotificationType(
+                userId, request.LocationId, request.NotificationTypeId, request.Id))
+            throw new TrackerForLocationAndTypeExistsException(
+                "You already have a tracker for this location and notification type.");
         var entity = mapper.Map(request, trackedLocation);
         entity.UpdatedAt = DateTime.UtcNow;
         return await trackedLocationForUserRepository.UpdateTrackerForUser(entity);
@@ -87,5 +96,15 @@ public class UserAppointmentTrackerBusiness(
     {
         return await trackedLocationForUserRepository.DeleteTrackerForUser(locationTrackerId,
             userId);
+    }
+
+    private async Task<bool> DoesUserAlreadyHaveTrackerForLocationAndNotificationType(
+        int userId, int locationId, int notificationTypeId, int trackerId = 0)
+    {
+        var trackedLocations = await
+            trackedLocationForUserRepository.GetTrackedLocationsForUser(userId);
+        return trackedLocations.Any(x =>
+            x.Id != trackerId &&
+            x.LocationId == locationId && x.NotificationTypeId == notificationTypeId);
     }
 }

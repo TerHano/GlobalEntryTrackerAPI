@@ -40,10 +40,11 @@ public class NotificationDispatcherService(
     {
         foreach (var trackedLocationForUser in trackers)
         {
-            var userRoleIntervalInHours =
-                trackedLocationForUser.User.UserRole.Role.NotificationIntervalInMinutes;
+            var userRoleIntervalInMinutes =
+                trackedLocationForUser.User.UserRoles.Max(r =>
+                    r.Role.NotificationIntervalInMinutes);
             trackedLocationForUser.NextNotificationAt =
-                trackedLocationForUser.NextNotificationAt.AddMinutes(userRoleIntervalInHours);
+                trackedLocationForUser.NextNotificationAt.AddMinutes(userRoleIntervalInMinutes);
         }
 
         await trackedLocationForUserRepository.UpdateListOfTrackers(trackers);

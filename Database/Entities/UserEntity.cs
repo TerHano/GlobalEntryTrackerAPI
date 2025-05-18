@@ -20,5 +20,5 @@ public class UserEntity
     public int? DiscordNotificationSettingsId { get; init; }
 
     public DiscordNotificationSettingsEntity? DiscordNotificationSettings { get; init; }
-    public virtual UserRoleEntity UserRole { get; set; }
+    public virtual List<UserRoleEntity> UserRoles { get; set; }
 }

@@ -7,6 +7,7 @@ using Database;
 using Database.Repositories;
 using GlobalEntryTrackerAPI.Endpoints;
 using GlobalEntryTrackerAPI.Middleware;
+using GlobalEntryTrackerAPI.Webhooks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
@@ -15,12 +16,15 @@ using Quartz;
 using Quartz.AspNetCore;
 using Service;
 using Service.Notification;
+using Stripe;
 
 var builder = WebApplication.CreateBuilder(args);
 
 const string globalEntryTrackerPolicy = "GlobalEntryTrackerPolicy";
 var allowedOrigins = builder.Configuration.GetValue<string>("AllowedOrigins") ?? "";
 
+StripeConfiguration.ApiKey = builder.Configuration.GetValue<string>("Stripe:SecretKey") ??
+                             throw new Exception("Stripe Secret Key is missing.");
 
 builder.Services.AddCors(options =>
 {
@@ -48,6 +52,7 @@ builder.Services.AddScoped<NotificationTypeRepository>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<DiscordNotificationSettingsRepository>();
 builder.Services.AddScoped<UserRoleRepository>();
+builder.Services.AddScoped<UserCustomerRepository>();
 
 
 //builder.Services.AddScoped<JwtService>();
@@ -58,6 +63,7 @@ builder.Services.AddScoped<UserBusiness>();
 builder.Services.AddScoped<DiscordNotificationSettingsBusiness>();
 builder.Services.AddScoped<NotificationManagerService>();
 builder.Services.AddScoped<NotificationDispatcherService>();
+builder.Services.AddScoped<SubscriptionBusiness>();
 
 builder.Services.AddScoped<UserAppointmentValidationService>();
 builder.Services.AddScoped<DiscordNotificationService>();
@@ -197,10 +203,12 @@ app.UseMiddleware<ApiResponseMiddleware>();
 
 app.MapLocationEndpoints();
 app.MapLocationTrackerEndpoints();
+app.MapSubscriptionEndpoints();
 app.MapNotificationEndpoints();
 app.MapAuthEndpoints();
 app.MapNotificationSettingsEndpoints();
 app.MapUserEndpoints();
+app.MapStripeWebHooks();
 
 app.UseAuthentication();
 app.UseAuthorization();

@@ -16,6 +16,8 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
     public DbSet<NotificationTypeEntity> NotificationTypes { get; set; }
     public DbSet<DiscordNotificationSettingsEntity> DiscordNotificationSettings { get; set; }
 
+    public DbSet<UserCustomerEntity> UserCustomers { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AppointmentLocationEntity>()
@@ -38,6 +40,13 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
 
         modelBuilder.Entity<UserRoleEntity>()
             .HasOne(e => e.User)
-            .WithOne(e => e.UserRole);
+            .WithMany(e => e.UserRoles);
+
+        modelBuilder.Entity<UserRoleEntity>()
+            .HasIndex(e => new { e.UserId, e.RoleId }).IsUnique();
+
+        modelBuilder.Entity<UserCustomerEntity>()
+            .HasOne(e => e.User)
+            .WithOne();
     }
 }

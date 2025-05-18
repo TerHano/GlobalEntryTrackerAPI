@@ -5,7 +5,7 @@ public class ApiResponse<T>
     public ApiResponse()
     {
         Success = true;
-        ErrorMessages = [];
+        Errors = [];
     }
 
 
@@ -13,11 +13,11 @@ public class ApiResponse<T>
     {
         Success = true;
         Data = data;
-        ErrorMessages = [];
+        Errors = [];
     }
 
 
-    public bool Success { get; set; } = true;
-    public string[] ErrorMessages { get; set; }
+    public bool Success { get; set; }
+    public List<Error> Errors { get; set; }
     public T? Data { get; set; }
 }

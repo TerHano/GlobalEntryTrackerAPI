@@ -22,10 +22,7 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-    </ItemGroup>
-
-    <ItemGroup>
-        <Folder Include="Exceptions\"/>
+        <PackageReference Include="Stripe.net" Version="48.1.0"/>
     </ItemGroup>
 
 </Project>

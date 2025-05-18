@@ -28,7 +28,7 @@ public class TrackedLocationForUserRepository(GlobalEntryTrackerDbContext contex
         return context.UserTrackedLocations.Include(x => x.NotificationType)
             .Include(x => x.Location)
             .Include(x => x.User)
-            .ThenInclude(x => x.UserRole)
+            .ThenInclude(x => x.UserRoles)
             .ThenInclude(x => x.Role)
             .Where(x => x.LocationId == locationId && x.NextNotificationAt <= now).ToList();
     }

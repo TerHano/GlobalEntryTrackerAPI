@@ -19,7 +19,7 @@ public class UserRepository(GlobalEntryTrackerDbContext context)
 
     public async Task<UserEntity> GetUserById(int userId)
     {
-        var user = await context.Users.Include(x => x.UserRole).ThenInclude(x => x.Role)
+        var user = await context.Users.Include(x => x.UserRoles).ThenInclude(x => x.Role)
             .FirstAsync(x => x.Id == userId);
         if (user is null) throw new NullReferenceException("User does not exist");
         return user;
