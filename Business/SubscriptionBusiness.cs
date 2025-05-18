@@ -51,6 +51,8 @@ public class SubscriptionBusiness(
         ManageSubscriptionSessionRequest request)
     {
         var userCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
+        if (userCustomer == null)
+            throw new NullReferenceException("User customer not found");
         var options = new Stripe.BillingPortal.SessionCreateOptions
         {
             Customer = userCustomer.CustomerId,
@@ -64,6 +66,8 @@ public class SubscriptionBusiness(
     public async Task<bool> ValidatePurchaseForUser(int userId)
     {
         var userCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
+        if (userCustomer == null)
+            return false;
         var service = new SubscriptionService();
         var subscription = await service.GetAsync(userCustomer.SubscriptionId);
         //User has a valid and active subscription
@@ -77,9 +81,11 @@ public class SubscriptionBusiness(
         return false;
     }
 
-    public async Task<UserSubscriptionDto> GetSubscriptionInformationForUser(int userId)
+    public async Task<UserSubscriptionDto?> GetSubscriptionInformationForUser(int userId)
     {
         var userCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
+        if (userCustomer == null)
+            return null;
         var service = new SubscriptionService();
         var subscription = await service.GetAsync(userCustomer.SubscriptionId);
         var paymentId = subscription.DefaultPaymentMethodId;

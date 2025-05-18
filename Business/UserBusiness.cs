@@ -6,6 +6,8 @@ using Database.Entities;
 using Database.Enums;
 using Database.Repositories;
 using Service;
+using Supabase.Gotrue;
+using Client = Supabase.Client;
 
 namespace Business;
 
@@ -18,7 +20,28 @@ public class UserBusiness(
 {
     public async Task CreateUser(CreateUserRequest request)
     {
-        var newUser = mapper.Map<UserEntity>(request);
+        var supabaseUrl = Environment.GetEnvironmentVariable("Auth__SupabaseUrl");
+        var supabaseKey = Environment.GetEnvironmentVariable("Auth__SupabaseKey");
+
+        var supabase = new Client(supabaseUrl, supabaseKey);
+        await supabase.InitializeAsync();
+        var signUpOptions = new SignUpOptions
+        {
+            RedirectTo = request.RedirectUrl
+        };
+        var response = await supabase.Auth.SignUp(request.Email, request.Password, signUpOptions);
+        var supabaseUser = response?.User;
+        if (supabaseUser == null) throw new Exception("User could not be created");
+        var newUser = new UserEntity
+        {
+            Id = 0,
+            ExternalId = supabaseUser.Id,
+            Email = request.Email,
+            FirstName = request.FirstName,
+            LastName = request.LastName,
+            CreatedAt = DateTime.UtcNow,
+            NextNotificationAt = DateTime.UtcNow
+        };
         await userRepository.CreateUser(newUser);
         var newUserRole = new UserRoleEntity
         {

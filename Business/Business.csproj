@@ -23,6 +23,7 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Stripe.net" Version="48.1.0"/>
+        <PackageReference Include="Supabase" Version="1.1.1"/>
     </ItemGroup>
 
 </Project>

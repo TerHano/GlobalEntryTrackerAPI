@@ -12,6 +12,6 @@ public static class AuthEndpoint
             {
                 await userBusiness.CreateUser(request);
                 return Results.Ok();
-            }).RequireAuthorization();
+            });
     }
 }
