@@ -1,0 +1,3 @@
+namespace Database.Entities.NotificationSettings;
+
+public class EmailNotificationSettingsEntity : INotificationSettings;

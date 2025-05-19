@@ -41,13 +41,7 @@ public class NotificationDispatcherService(
         List<TrackedLocationForUserEntity> trackers)
     {
         var users = trackers.Select(x => x.User).Distinct().ToList();
-        foreach (var user in users)
-        {
-            var userRoleIntervalInMinutes =
-                userRoleService.GetNextNotificationTimeForUser(user);
-            user.NextNotificationAt =
-                DateTime.UtcNow.AddMinutes(userRoleIntervalInMinutes);
-        }
+        foreach (var user in users) userRoleService.UpdateNextNotificationTimeForUser(user);
 
         await userRepository.UpdateMultipleUsers(users);
     }

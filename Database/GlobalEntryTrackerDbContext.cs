@@ -11,10 +11,13 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
     public DbSet<UserEntity> Users { get; set; }
     public DbSet<RoleEntity> Roles { get; set; }
     public DbSet<UserRoleEntity> UserRoles { get; set; }
+    public DbSet<UserNotificationEntity> UserNotifications { get; set; }
     public DbSet<TrackedLocationForUserEntity> UserTrackedLocations { get; set; }
     public DbSet<DiscordNotificationSettingsEntity> DiscordNotifications { get; set; }
     public DbSet<NotificationTypeEntity> NotificationTypes { get; set; }
     public DbSet<DiscordNotificationSettingsEntity> DiscordNotificationSettings { get; set; }
+
+    public DbSet<EmailNotificationSettingsEntity> EmailNotificationSettings { get; set; }
 
     public DbSet<UserCustomerEntity> UserCustomers { get; set; }
 
@@ -35,17 +38,22 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
             .WithMany()
             .HasForeignKey(e => e.UserId);
 
-        modelBuilder.Entity<UserEntity>()
+        modelBuilder.Entity<UserNotificationEntity>()
             .HasOne(e => e.DiscordNotificationSettings)
-            .WithOne(e => e.User)
-            .HasForeignKey<UserEntity>(e => e.DiscordNotificationSettingsId);
+            .WithOne(e => e.UserNotification)
+            .HasForeignKey<UserNotificationEntity>(e => e.DiscordNotificationSettingsId);
+
+        modelBuilder.Entity<UserNotificationEntity>()
+            .HasOne(e => e.EmailNotificationSettings)
+            .WithOne(e => e.UserNotification)
+            .HasForeignKey<UserNotificationEntity>(e => e.EmailNotificationSettingsId);
 
         modelBuilder.Entity<UserEntity>().Property(u => u.NextNotificationAt)
             .HasDefaultValue(DateTime.UtcNow);
 
         modelBuilder.Entity<UserRoleEntity>()
             .HasOne(e => e.User)
-            .WithMany(e => e.UserRoles);
+            .WithOne(e => e.UserRole);
 
         modelBuilder.Entity<UserRoleEntity>()
             .HasIndex(e => new { e.UserId, e.RoleId }).IsUnique();

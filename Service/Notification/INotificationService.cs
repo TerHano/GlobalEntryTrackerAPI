@@ -6,7 +6,7 @@ namespace Service.Notification;
 public interface INotificationService
 {
     Task SendNotification(List<LocationAppointmentDto> appointments,
-        AppointmentLocationEntity locationInformation, int userId);
+        AppointmentLocationEntity locationInformation, int? userId);
 
     Task SendTestNotification<T>(T settingsToTest);
 }

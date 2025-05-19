@@ -12,7 +12,6 @@ namespace Business;
 public class UserAppointmentTrackerBusiness(
     TrackedLocationForUserRepository trackedLocationForUserRepository,
     UserRepository userRepository,
-    UserRoleService userRoleService,
     JobService jobService,
     IMapper mapper,
     ILogger<UserAppointmentTrackerBusiness> logger)
@@ -39,7 +38,7 @@ public class UserAppointmentTrackerBusiness(
     public async Task<int> CreateTrackerForUser(CreateTrackerForUserRequest request, int userId)
     {
         var user = await userRepository.GetUserById(userId);
-        var maxTrackers = userRoleService.GetAllowedNumberOfTrackersForUser(user);
+        var maxTrackers = user.UserRole.Role.MaxTrackers;
         var trackedLocationsForUser =
             await trackedLocationForUserRepository.GetTrackedLocationsForUser(userId);
         if (await DoesUserAlreadyHaveTrackerForLocationAndNotificationType(

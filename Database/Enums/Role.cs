@@ -3,5 +3,6 @@ namespace Database.Enums;
 public enum Role
 {
     Free = 0,
-    Subscriber = 1
+    Subscriber = 1,
+    Admin = 2
 }

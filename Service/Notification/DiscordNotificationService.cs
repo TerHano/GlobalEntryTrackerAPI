@@ -23,10 +23,17 @@ public class DiscordNotificationService(
 
     public async Task SendNotification(
         List<LocationAppointmentDto> appointments, AppointmentLocationEntity locationInformation,
-        int userId)
+        int? userNotificationId)
     {
+        if (userNotificationId == null)
+        {
+            logger.LogError("User notification ID is null");
+            return;
+        }
+
         var settings =
-            await discordNotificationSettingsRepository.GetNotificationSettingsForUser(userId);
+            await discordNotificationSettingsRepository.GetNotificationSettingsForUser(
+                userNotificationId.Value);
         if (settings is { Enabled: true })
         {
             var message = GenerateDiscordMessageFromAppointment(appointments, locationInformation);

@@ -4,6 +4,7 @@ using Database.Entities;
 using Database.Enums;
 using Database.Repositories;
 using Microsoft.Extensions.Logging;
+using Service;
 using Stripe;
 using Stripe.Checkout;
 
@@ -13,6 +14,7 @@ public class SubscriptionBusiness(
     UserCustomerRepository userCustomerRepository,
     UserRoleRepository userRoleRepository,
     UserRepository userRepository,
+    UserRoleService userRoleService,
     ILogger<SubscriptionBusiness> logger)
 {
     public async Task<string> GetSubscriptionPaymentUrl(int userId,
@@ -73,7 +75,7 @@ public class SubscriptionBusiness(
         //User has a valid and active subscription
         if (subscription.Status.Equals("active"))
         {
-            await userRoleRepository.AddRoleForUser(userId, Role.Subscriber);
+            await userRoleRepository.AddEditRoleForUser(userId, Role.Subscriber);
             return true;
         }
 
@@ -172,8 +174,8 @@ public class SubscriptionBusiness(
                         SubscriptionId = subscriptionEvent.Id,
                         CustomerId = subscriptionEvent.CustomerId
                     };
-                    await userRoleRepository.AddRoleForUser(userIdInt, Role.Subscriber);
-                    await userCustomerRepository.AddUpdateUserCustomer(userCustomer);
+                    await userRoleRepository.AddEditRoleForUser(userIdInt, Role.Subscriber);
+                    await userCustomerRepository.AddEditUserCustomer(userCustomer);
 
                     //Move up users next notification date
                     var user = await userRepository.GetUserById(userIdInt);
@@ -183,8 +185,7 @@ public class SubscriptionBusiness(
                         throw new NullReferenceException("User not found");
                     }
 
-                    user.NextNotificationAt = user.NextNotificationAt.AddMinutes(
-                        user.UserRoles.Min(r => r.Role.NotificationIntervalInMinutes));
+                    userRoleService.UpdateNextNotificationTimeForUser(user);
                     await userRepository.UpdateUser(user);
                     break;
                 }

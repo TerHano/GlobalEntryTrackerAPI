@@ -1,9 +1,12 @@
 using Database.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Database.Repositories;
 
-public class UserCustomerRepository(GlobalEntryTrackerDbContext context)
+public class UserCustomerRepository(
+    GlobalEntryTrackerDbContext context,
+    ILogger<UserCustomerRepository> logger)
 {
     public async Task<UserCustomerEntity?> GetCustomerDetailsForUser(int userId)
     {
@@ -11,20 +14,28 @@ public class UserCustomerRepository(GlobalEntryTrackerDbContext context)
         return userCustomer;
     }
 
-    public async Task AddUpdateUserCustomer(UserCustomerEntity userCustomer)
+    public async Task AddEditUserCustomer(UserCustomerEntity userCustomer)
     {
-        var existingUserCustomer = await context.UserCustomers
-            .FirstOrDefaultAsync(x => x.UserId == userCustomer.UserId);
-        if (existingUserCustomer != null)
+        try
         {
-            existingUserCustomer.CustomerId = userCustomer.CustomerId;
-            existingUserCustomer.SubscriptionId = userCustomer.SubscriptionId;
-        }
-        else
-        {
-            await context.UserCustomers.AddAsync(userCustomer);
-        }
+            var existingUserCustomer = await context.UserCustomers
+                .FirstOrDefaultAsync(x => x.UserId == userCustomer.UserId);
+            if (existingUserCustomer != null)
+            {
+                existingUserCustomer.CustomerId = userCustomer.CustomerId;
+                existingUserCustomer.SubscriptionId = userCustomer.SubscriptionId;
+            }
+            else
+            {
+                await context.UserCustomers.AddAsync(userCustomer);
+            }
 
-        await context.SaveChangesAsync();
+            await context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            logger.LogError(ex.Message);
+            throw new DbUpdateException("Failed to add/edit user customer", ex);
+        }
     }
 }

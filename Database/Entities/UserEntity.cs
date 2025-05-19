@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using Database.Entities.NotificationSettings;
 
 namespace Database.Entities;
 
@@ -17,10 +16,8 @@ public class UserEntity
 
     public required DateTime CreatedAt { get; init; }
 
-    public int? DiscordNotificationSettingsId { get; init; }
-
-    public DiscordNotificationSettingsEntity? DiscordNotificationSettings { get; init; }
-    public virtual List<UserRoleEntity> UserRoles { get; set; }
+    public virtual UserRoleEntity UserRole { get; set; }
+    public virtual UserNotificationEntity UserNotification { get; set; }
 
     public required DateTime NextNotificationAt { get; set; }
 }

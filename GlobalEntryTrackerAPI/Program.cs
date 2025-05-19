@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Mail;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -6,6 +8,7 @@ using Business.Mappers;
 using Database;
 using Database.Repositories;
 using GlobalEntryTrackerAPI.Endpoints;
+using GlobalEntryTrackerAPI.Endpoints.Notifications;
 using GlobalEntryTrackerAPI.Middleware;
 using GlobalEntryTrackerAPI.Webhooks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -45,7 +48,6 @@ if (string.IsNullOrEmpty(connectionString)) throw new Exception("ConnectionStrin
 builder.Services.AddDbContextPool<GlobalEntryTrackerDbContext>(opt =>
     opt.UseNpgsql(connectionString));
 
-
 builder.Services.AddScoped<AppointmentLocationRepository>();
 builder.Services.AddScoped<TrackedLocationForUserRepository>();
 builder.Services.AddScoped<NotificationTypeRepository>();
@@ -54,6 +56,8 @@ builder.Services.AddScoped<DiscordNotificationSettingsRepository>();
 builder.Services.AddScoped<UserRoleRepository>();
 builder.Services.AddScoped<UserCustomerRepository>();
 builder.Services.AddScoped<PlanOptionRepository>();
+builder.Services.AddScoped<UserNotificationRepository>();
+builder.Services.AddScoped<EmailNotificationSettingsRepository>();
 
 
 //builder.Services.AddScoped<JwtService>();
@@ -62,6 +66,7 @@ builder.Services.AddScoped<UserAppointmentTrackerBusiness>();
 builder.Services.AddScoped<NotificationBusiness>();
 builder.Services.AddScoped<UserBusiness>();
 builder.Services.AddScoped<DiscordNotificationSettingsBusiness>();
+builder.Services.AddScoped<EmailNotificationSettingsBusiness>();
 builder.Services.AddScoped<NotificationManagerService>();
 builder.Services.AddScoped<NotificationDispatcherService>();
 builder.Services.AddScoped<SubscriptionBusiness>();
@@ -69,9 +74,28 @@ builder.Services.AddScoped<PlanBusiness>();
 
 builder.Services.AddScoped<UserAppointmentValidationService>();
 builder.Services.AddScoped<DiscordNotificationService>();
+builder.Services.AddScoped<EmailNotificationService>();
 builder.Services.AddScoped<JobService>();
 builder.Services.AddScoped<UserRoleService>();
 
+builder.Services.AddScoped<SmtpClient>(serviceProvider =>
+{
+    var config = serviceProvider.GetRequiredService<IConfiguration>();
+    var smtpHost = config.GetValue<string>("Smtp:Host");
+    var smtpPort = config.GetValue<int?>("Smtp:Port");
+    var smtpUsername = config.GetValue<string>("Smtp:Username");
+    var smtpPassword = config.GetValue<string>("Smtp:Password");
+    return new SmtpClient
+    {
+        UseDefaultCredentials = false,
+        EnableSsl = true,
+        Host = smtpHost ?? throw new Exception("Smtp Host is missing."),
+        Port = smtpPort ?? throw new Exception("Smtp Port is missing."),
+        Credentials =
+            new NetworkCredential(smtpUsername ?? throw new Exception("Smtp Username missing"),
+                smtpPassword ?? throw new Exception("Smtp Password missing"))
+    };
+});
 
 builder.Services.AddHttpClient();
 
@@ -149,17 +173,19 @@ builder.Services.AddAuthentication(options =>
 
             var user = await dbContext.Users.FirstOrDefaultAsync(user =>
                 user.ExternalId.Equals(externalUserId));
-
             if (user == null)
             {
                 context.Fail("User not found");
                 return;
             }
 
+            var userRole = await dbContext.UserRoles.Include(userRoleEntity => userRoleEntity.Role)
+                .FirstOrDefaultAsync(u => u.UserId == user.Id);
             var claims = new List<Claim>
             {
                 new("InternalId", user.Id.ToString())
             };
+            if (userRole != null) claims.Add(new Claim(ClaimTypes.Role, userRole.Role.Name));
             var identity = new ClaimsIdentity(claims);
             context.Principal?.AddIdentity(identity);
         }
@@ -186,7 +212,11 @@ builder.Services.AddQuartz(q =>
     //     .WithIdentity("SampleJob-trigger")
     //     .WithCronSchedule("0/5 * * * * ?")); // Execute every 5 seconds
 });
-builder.Services.AddAuthorization();
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("Admin", policy => policy.RequireRole("Admin"));
+});
 
 builder.Services.AddQuartzServer(options =>
 {
@@ -212,6 +242,11 @@ app.MapAuthEndpoints();
 app.MapNotificationSettingsEndpoints();
 app.MapUserEndpoints();
 app.MapStripeWebHooks();
+app.MapAdminEndpoints();
+
+//Notification endpoints
+app.MapDiscordNotificationEndpoints();
+app.MapEmailNotificationEndpoints();
 
 app.UseAuthentication();
 app.UseAuthorization();

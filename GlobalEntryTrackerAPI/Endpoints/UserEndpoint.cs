@@ -30,6 +30,7 @@ public static class UserEndpoint
         app.MapPut("/api/v1/me",
             async (HttpContext httpContext, UserBusiness userBusiness, UpdateUserRequest request) =>
             {
+                var jwt = httpContext.Request.GetBearerToken();
                 var userId = httpContext.User.GetUserId();
                 await userBusiness.UpdateUser(request, userId);
                 return Results.Ok();

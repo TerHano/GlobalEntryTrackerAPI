@@ -8,8 +8,8 @@ public class PlanOptionDto
     public string Name { get; set; } = null!;
     public string Description { get; set; } = null!;
     public string PriceId { get; set; } = null!;
-    public int Price { get; set; }
-    public int DiscountedPrice { get; set; }
+    public long Price { get; set; }
+    public string Currency { get; set; } = null!;
     public List<string> Features { get; set; } = null!;
     public PlanOptionFrequency Frequency { get; set; }
 }

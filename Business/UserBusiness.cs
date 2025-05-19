@@ -5,8 +5,8 @@ using Business.Dto.Requests;
 using Database.Entities;
 using Database.Enums;
 using Database.Repositories;
-using Service;
 using Supabase.Gotrue;
+using Supabase.Gotrue.Interfaces;
 using Client = Supabase.Client;
 
 namespace Business;
@@ -14,26 +14,23 @@ namespace Business;
 public class UserBusiness(
     TrackedLocationForUserRepository trackedLocationRepository,
     UserRepository userRepository,
+    UserNotificationRepository userNotificationRepository,
     UserRoleRepository userRoleRepository,
-    UserRoleService userRoleService,
     IMapper mapper)
 {
     public async Task CreateUser(CreateUserRequest request)
     {
-        var supabaseUrl = Environment.GetEnvironmentVariable("Auth__SupabaseUrl");
-        var supabaseKey = Environment.GetEnvironmentVariable("Auth__SupabaseKey");
-
-        var supabase = new Client(supabaseUrl, supabaseKey);
-        await supabase.InitializeAsync();
+        var supabaseClient = await GetSupabaseClient();
         var signUpOptions = new SignUpOptions
         {
             RedirectTo = request.RedirectUrl,
             Data = new Dictionary<string, object>
             {
-                { "first_name", request.FirstName }
+                { "first_name", request.FirstName }, { "last_name", request.LastName }
             }
         };
-        var response = await supabase.Auth.SignUp(request.Email, request.Password, signUpOptions);
+        var response =
+            await supabaseClient.Auth.SignUp(request.Email, request.Password, signUpOptions);
         var supabaseUser = response?.User;
         if (supabaseUser == null) throw new Exception("User could not be created");
         var newUser = new UserEntity
@@ -53,14 +50,25 @@ public class UserBusiness(
             RoleId = (int)Role.Free
         };
         await userRoleRepository.CreateUserRole(newUserRole);
+        await userNotificationRepository.CreateUserNotification(newUser.Id);
     }
 
     public async Task UpdateUser(UpdateUserRequest request, int userId)
     {
         var user = await userRepository.GetUserById(userId);
         if (user == null) throw new Exception("User not found");
-        mapper.Map(request, user);
         await userRepository.UpdateUser(user);
+        var supabaseAdminClient = await GetSupabaseAdminClient();
+        await supabaseAdminClient.UpdateUserById(user.ExternalId,
+            new AdminUserAttributes
+            {
+                UserMetadata = new Dictionary<string, object>
+                {
+                    { "first_name", request.FirstName },
+                    { "last_name", request.LastName }
+                }
+            });
+        mapper.Map(request, user);
     }
 
     public async Task<UserDto> GetUserById(int userId)
@@ -84,7 +92,7 @@ public class UserBusiness(
         var trackersForUser = await trackedLocationRepository.GetTrackedLocationsForUser(userId);
         var numOfTrackers = trackersForUser.Count;
         var user = await userRepository.GetUserById(userId);
-        var maxTrackers = userRoleService.GetAllowedNumberOfTrackersForUser(user);
+        var maxTrackers = user.UserRole.Role.MaxTrackers;
         var permissions = new PermissionsDto
         {
             CanCreateTracker = numOfTrackers < maxTrackers
@@ -95,7 +103,7 @@ public class UserBusiness(
 
     public async Task<NotificationCheckDto> DoesUserHaveNotificationsSetUp(int userId)
     {
-        var user = await userRepository.GetUserWithNotificationSettings(userId);
+        var user = await userNotificationRepository.GetUserWithNotificationSettings(userId);
         var isNotificationsSetUp = false;
         var isAnyNotificationsEnabled = false;
         if (user.DiscordNotificationSettingsId != null) isNotificationsSetUp = true;
@@ -109,12 +117,40 @@ public class UserBusiness(
 
     public async Task<UserNotificationSettingsDto> GetAllNotificationsForUser(int userId)
     {
-        var user = await userRepository.GetUserWithNotificationSettings(userId);
+        var user = await userNotificationRepository.GetUserWithNotificationSettings(userId);
         var userNotificationSettingsDto = new UserNotificationSettingsDto
         {
             DiscordSettings =
-                mapper.Map<DiscordNotificationSettingsDto>(user.DiscordNotificationSettings)
+                mapper.Map<DiscordNotificationSettingsDto>(user.DiscordNotificationSettings),
+            EmailSettings =
+                mapper.Map<EmailNotificationSettingsDto>(user.EmailNotificationSettings)
         };
         return userNotificationSettingsDto;
+    }
+
+    public async Task DeleteUserById(int userId)
+    {
+        var user = await userRepository.GetUserById(userId);
+        var supabaseAdminClient = await GetSupabaseAdminClient();
+        var response = await supabaseAdminClient.DeleteUser(user.ExternalId);
+        if (response == null) throw new Exception("User could not be deleted");
+        await userRepository.DeleteUser(userId);
+    }
+
+    private async Task<Client> GetSupabaseClient()
+    {
+        var supabaseUrl = Environment.GetEnvironmentVariable("Auth__SupabaseUrl");
+        var supabaseKey = Environment.GetEnvironmentVariable("Auth__SupabaseAnonKey");
+        var supabaseClient = new Client(supabaseUrl, supabaseKey);
+        await supabaseClient.InitializeAsync();
+        return supabaseClient;
+    }
+
+    private async Task<IGotrueAdminClient<User>> GetSupabaseAdminClient()
+    {
+        var supabaseServiceKey = Environment.GetEnvironmentVariable("Auth__SupabaseServiceKey");
+
+        var supabaseClient = await GetSupabaseClient();
+        return supabaseClient.AdminAuth(supabaseServiceKey);
     }
 }
