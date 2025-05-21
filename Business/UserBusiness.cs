@@ -57,7 +57,7 @@ public class UserBusiness(
             {
                 UserNotificationId = notificationId,
                 Email = request.Email,
-                Enabled = true
+                Enabled = false
             });
     }
 
