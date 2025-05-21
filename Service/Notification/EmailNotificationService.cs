@@ -1,6 +1,7 @@
 using System.Net.Mail;
 using System.Text;
 using Database.Entities;
+using Database.Entities.NotificationSettings;
 using Database.Repositories;
 using Microsoft.Extensions.Logging;
 using Service.Dto;
@@ -12,36 +13,30 @@ public class EmailNotificationService(
     UserNotificationRepository userNotificationRepository,
     ILogger<EmailNotificationService> logger) : INotificationService
 {
-    public async Task SendNotification(List<LocationAppointmentDto> appointments,
-        AppointmentLocationEntity locationInformation, int? userNotificationId)
+    public async Task SendTestNotification<T>(T settingsToTest)
     {
-        if (userNotificationId == null)
+        if (settingsToTest is string email)
+        {
+            var message = GenerateEmailMessage(email, "Test Email",
+                "<h1>This is a test email</h1><p>If you see this, the email service is working.</p>");
+            await smtpClient.SendMailAsync(message);
+        }
+    }
+
+    public async Task SendNotification<T>(List<LocationAppointmentDto> appointments,
+        AppointmentLocationEntity locationInformation, T emailNotificationSettings)
+    {
+        if (emailNotificationSettings is not EmailNotificationSettingsEntity
+            emailNotificationSettingsEntity)
         {
             logger.LogError("User notification ID is null");
             return;
         }
 
-        var userNotification =
-            await userNotificationRepository.GetUserWithNotificationSettings(userNotificationId
-                .Value);
-        var user = userNotification.User;
-        if (user == null)
-            throw new ApplicationException("No user found");
-        if (user.Email == null)
-            throw new ApplicationException("No email found for user");
-        var userEmail = user.Email;
+        var userEmail = emailNotificationSettingsEntity.Email;
         var message =
             GenerateEmailMessageFromAppointment(appointments, locationInformation, userEmail);
         await smtpClient.SendMailAsync(message);
-    }
-
-    public async Task SendTestNotification<T>(T settingsToTest)
-    {
-        if (settingsToTest is string email)
-        {
-            var message = GenerateTestEmailMessage(email);
-            await smtpClient.SendMailAsync(message);
-        }
     }
 
     private MailMessage GenerateEmailMessageFromAppointment(
@@ -49,19 +44,9 @@ public class EmailNotificationService(
         AppointmentLocationEntity locationInformation,
         string userEmail)
     {
-        var fromAddress =
-            Environment.GetEnvironmentVariable("Smtp__FromAddress");
-        if (fromAddress == null)
-            throw new ApplicationException("From address is not set in environment variables");
-
-        var message = new MailMessage
-        {
-            Subject = "Available Appointments",
-            Body = GenerateEmailBody(appointments, locationInformation),
-            IsBodyHtml = true,
-            To = { new MailAddress(userEmail) },
-            From = new MailAddress(fromAddress)
-        };
+        var body = GenerateEmailBody(appointments, locationInformation);
+        var message = GenerateEmailMessage(userEmail, "Available Appointments",
+            body);
 
         return message;
     }
@@ -82,21 +67,23 @@ public class EmailNotificationService(
         return body.ToString();
     }
 
-    private MailMessage GenerateTestEmailMessage(
-        string userEmail)
+    private MailMessage GenerateEmailMessage(string to, string subject, string body)
     {
         var fromAddress =
             Environment.GetEnvironmentVariable("Smtp__FromAddress");
-        if (fromAddress == null)
-            throw new ApplicationException("From address is not set in environment variables");
+        var fromName =
+            Environment.GetEnvironmentVariable("Smtp__FromName");
+        if (fromAddress == null || fromName == null)
+            throw new ApplicationException(
+                "From address or name is not set in environment variables");
 
         var message = new MailMessage
         {
-            Subject = "Test Email",
-            Body = "This is a test email.",
+            Subject = subject,
+            Body = body,
             IsBodyHtml = true,
-            To = { new MailAddress(userEmail) },
-            From = new MailAddress(fromAddress)
+            To = { new MailAddress(to) },
+            From = new MailAddress(fromAddress, fromName)
         };
 
         return message;

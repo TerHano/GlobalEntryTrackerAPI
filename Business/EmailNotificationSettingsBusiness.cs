@@ -9,7 +9,6 @@ using Service.Enum;
 namespace Business;
 
 public class EmailNotificationSettingsBusiness(
-    EmailNotificationSettingsRepository emailNotificationSettingsRepository,
     UserNotificationRepository userNotificationRepository,
     NotificationManagerService notificationManager,
     UserRepository userRepository,
@@ -27,25 +26,23 @@ public class EmailNotificationSettingsBusiness(
     public async Task<int> CreateEmailNotificationSettingsForUser(
         CreateEmailNotificationSettingsRequest settings, int userId)
     {
-        var userNotification =
-            await userNotificationRepository.GetUserWithNotificationSettings(userId);
+        var user = await userRepository.GetUserById(userId);
         var entity = mapper.Map<EmailNotificationSettingsEntity>(settings);
-        userNotification.EmailNotificationSettings = entity;
-        await userNotificationRepository.UpdateUserNotification(userNotification);
-        return userNotification.EmailNotificationSettings.Id;
+        entity.Email = user.Email;
+        var id = await userNotificationRepository.UpdateUserEmailNotificationSettings(userId,
+            entity);
+        return id;
     }
 
     public async Task<int> UpdateEmailNotificationSettingsForUser(
         UpdateEmailNotificationSettingsRequest settings, int userId)
     {
-        var userNotification =
-            await userNotificationRepository.GetUserWithNotificationSettings(userId);
-        if (userNotification.EmailNotificationSettingsId != settings.Id)
-            throw new UnauthorizedAccessException("Cannot update settings");
         var entity = mapper.Map<EmailNotificationSettingsEntity>(settings);
-        userNotification.EmailNotificationSettings = entity;
-        await userNotificationRepository.UpdateUserNotification(userNotification);
-        return userNotification.EmailNotificationSettings.Id;
+        var user = await userRepository.GetUserById(userId);
+        entity.Email = user.Email;
+        var id = await userNotificationRepository.UpdateUserEmailNotificationSettings(userId,
+            entity);
+        return id;
     }
 
     public async Task SendEmailTestMessage(int userId)

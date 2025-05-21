@@ -3,6 +3,7 @@ using System;
 using Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Database.Migrations
 {
     [DbContext(typeof(GlobalEntryTrackerDbContext))]
-    partial class GlobalEntryTrackerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250519070002_Make UserNotificationId required")]
+    partial class MakeUserNotificationIdrequired
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -70,33 +73,6 @@ namespace Database.Migrations
                     b.ToTable("AppointmentLocations");
                 });
 
-            modelBuilder.Entity("Database.Entities.ArchivedAppointmentEntity", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("EndTimestamp")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("LocationId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("ScannedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("StartTimestamp")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LocationId");
-
-                    b.ToTable("ArchivedAppointments");
-                });
-
             modelBuilder.Entity("Database.Entities.NotificationSettings.DiscordNotificationSettingsEntity", b =>
                 {
                     b.Property<int>("Id")
@@ -128,10 +104,6 @@ namespace Database.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.Property<bool>("Enabled")
                         .HasColumnType("boolean");
@@ -325,7 +297,7 @@ namespace Database.Migrations
                     b.Property<DateTime>("NextNotificationAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValue(new DateTime(2025, 5, 20, 3, 30, 9, 140, DateTimeKind.Utc).AddTicks(2720));
+                        .HasDefaultValue(new DateTime(2025, 5, 19, 7, 0, 2, 433, DateTimeKind.Utc).AddTicks(6940));
 
                     b.HasKey("Id");
 
@@ -388,17 +360,6 @@ namespace Database.Migrations
                         .IsUnique();
 
                     b.ToTable("UserRoles");
-                });
-
-            modelBuilder.Entity("Database.Entities.ArchivedAppointmentEntity", b =>
-                {
-                    b.HasOne("Database.Entities.AppointmentLocationEntity", "Location")
-                        .WithMany()
-                        .HasForeignKey("LocationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Location");
                 });
 
             modelBuilder.Entity("Database.Entities.TrackedLocationForUserEntity", b =>

@@ -3,6 +3,7 @@ using Business.Dto;
 using Business.Dto.NotificationSettings;
 using Business.Dto.Requests;
 using Database.Entities;
+using Database.Entities.NotificationSettings;
 using Database.Enums;
 using Database.Repositories;
 using Supabase.Gotrue;
@@ -50,13 +51,22 @@ public class UserBusiness(
             RoleId = (int)Role.Free
         };
         await userRoleRepository.CreateUserRole(newUserRole);
-        await userNotificationRepository.CreateUserNotification(newUser.Id);
+        var notificationId = await userNotificationRepository.CreateUserNotification(newUser.Id);
+        await userNotificationRepository.UpdateUserEmailNotificationSettings(newUser.Id,
+            new EmailNotificationSettingsEntity
+            {
+                UserNotificationId = notificationId,
+                Email = request.Email,
+                Enabled = true
+            });
     }
 
     public async Task UpdateUser(UpdateUserRequest request, int userId)
     {
         var user = await userRepository.GetUserById(userId);
         if (user == null) throw new Exception("User not found");
+        user.FirstName = request.FirstName;
+        user.LastName = request.LastName;
         await userRepository.UpdateUser(user);
         var supabaseAdminClient = await GetSupabaseAdminClient();
         await supabaseAdminClient.UpdateUserById(user.ExternalId,
@@ -103,15 +113,14 @@ public class UserBusiness(
 
     public async Task<NotificationCheckDto> DoesUserHaveNotificationsSetUp(int userId)
     {
-        var user = await userNotificationRepository.GetUserWithNotificationSettings(userId);
-        var isNotificationsSetUp = false;
-        var isAnyNotificationsEnabled = false;
-        if (user.DiscordNotificationSettingsId != null) isNotificationsSetUp = true;
-        if (user.DiscordNotificationSettings is { Enabled: true }) isAnyNotificationsEnabled = true;
+        var userNotification =
+            await userNotificationRepository.GetUserWithNotificationSettings(userId);
+        var isAnyNotificationsEnabled =
+            userNotification?.EmailNotificationSettings?.Enabled == true ||
+            userNotification?.DiscordNotificationSettings?.Enabled == true;
         return new NotificationCheckDto
         {
-            IsNotificationsSetUp = isNotificationsSetUp,
-            isAnyNotificationsEnabled = isAnyNotificationsEnabled
+            IsAnyNotificationsEnabled = isAnyNotificationsEnabled
         };
     }
 

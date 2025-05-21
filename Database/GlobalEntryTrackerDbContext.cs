@@ -23,10 +23,16 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
 
     public DbSet<PlanOptionEntity> PlanOptions { get; set; }
 
+    public DbSet<ArchivedAppointmentEntity> ArchivedAppointments { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AppointmentLocationEntity>()
             .HasIndex(e => e.ExternalId).IsUnique();
+
+        modelBuilder.Entity<ArchivedAppointmentEntity>()
+            .HasOne(e => e.Location)
+            .WithMany();
 
         modelBuilder.Entity<TrackedLocationForUserEntity>()
             .HasOne(e => e.Location)
@@ -38,10 +44,30 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
             .WithMany()
             .HasForeignKey(e => e.UserId);
 
+        modelBuilder.Entity<DiscordNotificationSettingsEntity>()
+            .HasOne(d => d.UserNotification)
+            .WithOne(u => u.DiscordNotificationSettings)
+            .HasForeignKey<DiscordNotificationSettingsEntity>(d => d.UserNotificationId)
+            .IsRequired();
+
+
+        modelBuilder.Entity<EmailNotificationSettingsEntity>()
+            .HasOne(d => d.UserNotification)
+            .WithOne(u => u.EmailNotificationSettings)
+            .HasForeignKey<EmailNotificationSettingsEntity>(d => d.UserNotificationId)
+            .IsRequired();
+
+
         modelBuilder.Entity<UserNotificationEntity>()
             .HasOne(e => e.DiscordNotificationSettings)
             .WithOne(e => e.UserNotification)
             .HasForeignKey<UserNotificationEntity>(e => e.DiscordNotificationSettingsId);
+
+        modelBuilder.Entity<UserNotificationEntity>()
+            .HasOne(e => e.EmailNotificationSettings)
+            .WithOne(e => e.UserNotification)
+            .HasForeignKey<UserNotificationEntity>(e => e.EmailNotificationSettingsId);
+
 
         modelBuilder.Entity<UserNotificationEntity>()
             .HasOne(e => e.EmailNotificationSettings)

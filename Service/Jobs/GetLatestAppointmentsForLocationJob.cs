@@ -6,7 +6,8 @@ namespace Service.Jobs;
 
 public class GetLatestAppointmentsForLocationJob(
     HttpClient httpClient,
-    NotificationDispatcherService notificationDispatcherService) : IJob
+    NotificationDispatcherService notificationDispatcherService,
+    AppointmentArchiveService appointmentArchiveService) : IJob
 {
     private readonly JsonSerializerOptions _jsonSerializerOptions =
         new()
@@ -20,16 +21,17 @@ public class GetLatestAppointmentsForLocationJob(
         Console.WriteLine("Executing job to get latest appointments for location");
         var externalLocationId = context.JobDetail.JobDataMap.GetIntValue("externalLocationId");
         var appointmentUrl =
-            $"https://ttp.cbp.dhs.gov/schedulerapi/slots?orderBy=soonest&locationId={externalLocationId}&minimum=1&limit=500";
+            $"https://ttp.cbp.dhs.gov/schedulerapi/slots?orderBy=soonest&locationId={externalLocationId}&minimum=1&limit=100";
         var response = await httpClient.GetAsync(appointmentUrl);
         if (response.IsSuccessStatusCode)
         {
             var jsonContent = await response.Content.ReadAsStringAsync();
-            var locationAppointment =
+            var locationAppointments =
                 JsonSerializer.Deserialize<List<LocationAppointmentDto>>(jsonContent,
                     _jsonSerializerOptions);
-            if (locationAppointment == null || locationAppointment.Count == 0) return;
-            await notificationDispatcherService.SendNotificationForLocation(locationAppointment,
+            if (locationAppointments == null || locationAppointments.Count == 0) return;
+            await appointmentArchiveService.ArchiveAppointments(locationAppointments);
+            await notificationDispatcherService.SendNotificationForLocation(locationAppointments,
                 externalLocationId);
         }
     }

@@ -85,9 +85,22 @@ public class SubscriptionBusiness(
 
     public async Task<UserSubscriptionDto?> GetSubscriptionInformationForUser(int userId)
     {
+        var freePlanInformation = new UserSubscriptionDto
+        {
+            ActiveBilledSubscription = false,
+            PlanName = "Free",
+            PlanPrice = 0,
+            Currency = "USD",
+            PlanInterval = "month",
+            NextPaymentDate =
+                null,
+            IsEnding = false,
+            CardLast4Digits = null,
+            CardBrand = null
+        };
         var userCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
         if (userCustomer == null)
-            return null;
+            return freePlanInformation;
         var service = new SubscriptionService();
         var subscription = await service.GetAsync(userCustomer.SubscriptionId);
         var paymentId = subscription.DefaultPaymentMethodId;
@@ -122,9 +135,11 @@ public class SubscriptionBusiness(
             throw new NullReferenceException("Product not found");
         //Get Product Metadata
 
+        if (!subscription.Status.Equals("active")) return freePlanInformation;
+
         var userSubscription = new UserSubscriptionDto
         {
-            Active = subscription.Status.Equals("active"),
+            ActiveBilledSubscription = true,
             PlanName = product.Name,
             PlanPrice = latestSubscriptionItem.Price.UnitAmount ?? 0,
             Currency = latestSubscriptionItem.Price.Currency,

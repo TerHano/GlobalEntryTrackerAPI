@@ -7,4 +7,5 @@ public class TrackedLocationForUserDto
     public bool Enabled { get; set; }
     public NotificationTypeDto NotificationType { get; set; }
     public DateOnly CutOffDate { get; set; }
+    public DateTime? LastSeenEarliestAppointment { get; set; }
 }

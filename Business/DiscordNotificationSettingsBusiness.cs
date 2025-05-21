@@ -3,14 +3,12 @@ using Business.Dto.NotificationSettings;
 using Business.Dto.Requests;
 using Database.Entities.NotificationSettings;
 using Database.Repositories;
-using Quartz;
 using Service;
 using Service.Enum;
 
 namespace Business;
 
 public class DiscordNotificationSettingsBusiness(
-    DiscordNotificationSettingsRepository discordNotificationSettingsRepository,
     UserNotificationRepository userNotificationRepository,
     NotificationManagerService notificationManager,
     IMapper mapper)
@@ -28,25 +26,19 @@ public class DiscordNotificationSettingsBusiness(
     public async Task<int> CreateDiscordNotificationSettingsForUser(
         CreateDiscordSettingsRequest settings, int userId)
     {
-        var userNotification =
-            await userNotificationRepository.GetUserWithNotificationSettings(userId);
         var entity = mapper.Map<DiscordNotificationSettingsEntity>(settings);
-        userNotification.DiscordNotificationSettings = entity;
-        await userNotificationRepository.UpdateUserNotification(userNotification);
-        return userNotification.DiscordNotificationSettings.Id;
+        var id = await userNotificationRepository.UpdateUserDiscordNotificationSettings(userId,
+            entity);
+        return id;
     }
 
     public async Task<int> UpdateDiscordNotificationSettingsForUser(
         UpdateDiscordSettingsRequest settings, int userId)
     {
         var entity = mapper.Map<DiscordNotificationSettingsEntity>(settings);
-        var userNotification =
-            await userNotificationRepository.GetUserWithNotificationSettings(userId);
-        if (userNotification.DiscordNotificationSettingsId != settings.Id)
-            throw new UnableToInterruptJobException("Cannot update settings");
-        userNotification.DiscordNotificationSettings = entity;
-        await userNotificationRepository.UpdateUserNotification(userNotification);
-        return userNotification.DiscordNotificationSettings.Id;
+        var id = await userNotificationRepository.UpdateUserDiscordNotificationSettings(userId,
+            entity);
+        return id;
     }
 
     public async Task SendDiscordTestMessage(TestDiscordSettingsRequest notificationSettings)

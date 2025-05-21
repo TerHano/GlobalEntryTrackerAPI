@@ -22,10 +22,10 @@ public class NotificationManagerService(
         {
             SendNotificationForService(
                 NotificationServiceType.Discord, locationAppointments,
-                appointmentLocation, userNotification.DiscordNotificationSettingsId),
+                appointmentLocation, userNotification.DiscordNotificationSettings),
             SendNotificationForService(NotificationServiceType.Email,
                 locationAppointments, appointmentLocation,
-                userNotification.EmailNotificationSettingsId)
+                userNotification.EmailNotificationSettings)
         };
         await Task.WhenAll(notificationTasks);
     }
@@ -38,9 +38,9 @@ public class NotificationManagerService(
         await service.SendTestNotification(notificationSettings);
     }
 
-    private async Task SendNotificationForService(NotificationServiceType serviceType,
+    private async Task SendNotificationForService<T>(NotificationServiceType serviceType,
         List<LocationAppointmentDto> locationAppointments,
-        AppointmentLocationEntity locationInformation, int? userNotificationId)
+        AppointmentLocationEntity locationInformation, T userNotificationSettings)
     {
         var service = GetNotificationInstanceForService(serviceType);
         if (service == null)
@@ -50,7 +50,7 @@ public class NotificationManagerService(
         }
 
         await service.SendNotification(locationAppointments, locationInformation,
-            userNotificationId);
+            userNotificationSettings);
     }
 
     private INotificationService? GetNotificationInstanceForService(

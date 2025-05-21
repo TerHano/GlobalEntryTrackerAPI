@@ -4,7 +4,6 @@ using System.Text.Json;
 using Business.Dto.Requests;
 using Database.Entities;
 using Database.Entities.NotificationSettings;
-using Database.Repositories;
 using Microsoft.Extensions.Logging;
 using Service.Dto;
 
@@ -12,7 +11,6 @@ namespace Service.Notification;
 
 public class DiscordNotificationService(
     ILogger<DiscordNotificationService> logger,
-    DiscordNotificationSettingsRepository discordNotificationSettingsRepository,
     HttpClient httpClient)
     : INotificationService
 {
@@ -21,23 +19,22 @@ public class DiscordNotificationService(
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
     };
 
-    public async Task SendNotification(
+    public async Task SendNotification<T>(
         List<LocationAppointmentDto> appointments, AppointmentLocationEntity locationInformation,
-        int? userNotificationId)
+        T userNotificationSettings)
     {
-        if (userNotificationId == null)
+        if (userNotificationSettings is null ||
+            userNotificationSettings is not DiscordNotificationSettingsEntity
+                discordNotificationSettings)
         {
             logger.LogError("User notification ID is null");
             return;
         }
 
-        var settings =
-            await discordNotificationSettingsRepository.GetNotificationSettingsForUser(
-                userNotificationId.Value);
-        if (settings is { Enabled: true })
+        if (discordNotificationSettings is { Enabled: true })
         {
             var message = GenerateDiscordMessageFromAppointment(appointments, locationInformation);
-            await SendMessageThroughWebhook(settings, message);
+            await SendMessageThroughWebhook(discordNotificationSettings, message);
         }
     }
 

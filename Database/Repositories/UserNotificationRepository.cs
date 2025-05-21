@@ -1,4 +1,5 @@
 using Database.Entities;
+using Database.Entities.NotificationSettings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -37,18 +38,47 @@ public class UserNotificationRepository(
     }
 
     //Update a user notification
-    public async Task<int> UpdateUserNotification(UserNotificationEntity entity)
+    public async Task<int> UpdateUserDiscordNotificationSettings(int userId,
+        DiscordNotificationSettingsEntity discordNotificationSettingsEntity)
     {
         var userNotification = await context.UserNotifications
-            .FirstOrDefaultAsync(user => user.Id == entity.Id);
+            .FirstOrDefaultAsync(x => x.UserId == userId);
         if (userNotification is null)
         {
             logger.LogError("UserNotification does not exist");
             throw new NullReferenceException("UserNotification does not exist");
         }
 
-        context.UserNotifications.Update(entity);
+        if (userNotification.DiscordNotificationSettingsId.HasValue &&
+            userNotification.DiscordNotificationSettingsId != discordNotificationSettingsEntity.Id)
+            throw new UnauthorizedAccessException("No access to this notification settings");
+
+        discordNotificationSettingsEntity.UserNotificationId = userNotification.Id;
+        userNotification.DiscordNotificationSettings = discordNotificationSettingsEntity;
+        //context.UserNotifications.Update(entity);
         await context.SaveChangesAsync();
-        return entity.Id;
+        return userNotification.Id;
+    }
+
+    public async Task<int> UpdateUserEmailNotificationSettings(int userId,
+        EmailNotificationSettingsEntity emailNotificationSettingsEntity)
+    {
+        var userNotification = await context.UserNotifications
+            .FirstOrDefaultAsync(x => x.UserId == userId);
+        if (userNotification is null)
+        {
+            logger.LogError("UserNotification does not exist");
+            throw new NullReferenceException("UserNotification does not exist");
+        }
+
+        if (userNotification.EmailNotificationSettingsId.HasValue &&
+            userNotification.EmailNotificationSettingsId != emailNotificationSettingsEntity.Id)
+            throw new UnauthorizedAccessException("No access to this notification settings");
+
+        emailNotificationSettingsEntity.UserNotificationId = userNotification.Id;
+        userNotification.EmailNotificationSettings = emailNotificationSettingsEntity;
+
+        await context.SaveChangesAsync();
+        return emailNotificationSettingsEntity.Id;
     }
 }

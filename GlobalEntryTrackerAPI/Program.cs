@@ -46,18 +46,20 @@ var connectionString = builder.Configuration.GetValue<string>("Database:Connecti
 if (string.IsNullOrEmpty(connectionString)) throw new Exception("ConnectionString is missing.");
 
 builder.Services.AddDbContextPool<GlobalEntryTrackerDbContext>(opt =>
-    opt.UseNpgsql(connectionString));
+{
+    opt.UseNpgsql(connectionString);
+    opt.EnableSensitiveDataLogging();
+});
 
 builder.Services.AddScoped<AppointmentLocationRepository>();
 builder.Services.AddScoped<TrackedLocationForUserRepository>();
 builder.Services.AddScoped<NotificationTypeRepository>();
 builder.Services.AddScoped<UserRepository>();
-builder.Services.AddScoped<DiscordNotificationSettingsRepository>();
 builder.Services.AddScoped<UserRoleRepository>();
 builder.Services.AddScoped<UserCustomerRepository>();
 builder.Services.AddScoped<PlanOptionRepository>();
 builder.Services.AddScoped<UserNotificationRepository>();
-builder.Services.AddScoped<EmailNotificationSettingsRepository>();
+builder.Services.AddScoped<ArchivedAppointmentsRepository>();
 
 
 //builder.Services.AddScoped<JwtService>();
@@ -77,6 +79,7 @@ builder.Services.AddScoped<DiscordNotificationService>();
 builder.Services.AddScoped<EmailNotificationService>();
 builder.Services.AddScoped<JobService>();
 builder.Services.AddScoped<UserRoleService>();
+builder.Services.AddScoped<AppointmentArchiveService>();
 
 builder.Services.AddScoped<SmtpClient>(serviceProvider =>
 {
@@ -206,11 +209,11 @@ builder.Services.AddQuartz(q =>
     // // Register jobs and triggers here (see step 3)
     // // Example: Register a job and trigger to run every 5 seconds.
     // var jobKey = new JobKey("SampleJob");
-    // q.AddJob<SampleJob>(opts => opts.WithIdentity(jobKey));
+    // var jobKey = new JobKey("ActiveJobManagerJob");
+    // q.AddJob<ActiveJobManagerJob>(opts => opts.WithIdentity(jobKey));
     // q.AddTrigger(opts => opts
     //     .ForJob(jobKey)
-    //     .WithIdentity("SampleJob-trigger")
-    //     .WithCronSchedule("0/5 * * * * ?")); // Execute every 5 seconds
+    //     .WithIdentity("ActiveJob-trigger").StartNow());
 });
 
 builder.Services.AddAuthorization(options =>

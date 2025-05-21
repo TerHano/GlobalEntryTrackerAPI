@@ -72,26 +72,15 @@ public class TrackedLocationForUserRepository(
         }
     }
 
-    public async Task<List<int>> UpdateListOfTrackers(
-        List<TrackedLocationForUserEntity> trackedLocationsForUser)
+    public async Task<List<int>> GetAllActiveDistinctLocationTrackerLocationIds()
     {
-        try
-        {
-            var updatedTrackers = new List<int>();
-            foreach (var trackedLocationForUser in trackedLocationsForUser)
-            {
-                var entity = context.Update(trackedLocationForUser);
-                updatedTrackers.Add(entity.Entity.Id);
-            }
-
-            await context.SaveChangesAsync();
-            return updatedTrackers;
-        }
-        catch (DbUpdateException ex)
-        {
-            logger.LogError(ex.Message);
-            throw new DbUpdateException("Failed to update list of trackers for user", ex);
-        }
+        var externalLocationIds = await context.UserTrackedLocations
+            // .Include(x => x.Location)
+            .Where(x => x.Enabled == true)
+            .Select(x => x.LocationId)
+            .Distinct()
+            .ToListAsync();
+        return externalLocationIds;
     }
 
     public async Task<int> DeleteTrackerForUser(int trackerId, int userId)

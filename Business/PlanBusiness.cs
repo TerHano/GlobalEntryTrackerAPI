@@ -33,6 +33,7 @@ public class PlanBusiness(PlanOptionRepository planOptionRepository, IMapper map
             }
         }
 
+        planOptionsDto = planOptionsDto.OrderBy(x => x.Price).ToList();
         return planOptionsDto;
     }
 }

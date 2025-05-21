@@ -24,7 +24,7 @@ public class UserRepository(GlobalEntryTrackerDbContext context, ILogger<UserRep
     {
         try
         {
-            context.Users.Update(user);
+            //context.Users.Update(user);
             await context.SaveChangesAsync();
         }
         catch (DbUpdateException ex)
