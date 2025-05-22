@@ -6,6 +6,7 @@ using Database.Entities;
 using Database.Entities.NotificationSettings;
 using Database.Enums;
 using Database.Repositories;
+using Quartz;
 using Supabase.Gotrue;
 using Supabase.Gotrue.Interfaces;
 using Client = Supabase.Client;
@@ -17,6 +18,7 @@ public class UserBusiness(
     UserRepository userRepository,
     UserNotificationRepository userNotificationRepository,
     UserRoleRepository userRoleRepository,
+    ISchedulerFactory schedulerFactory,
     IMapper mapper)
 {
     public async Task CreateUser(CreateUserRequest request)
@@ -85,6 +87,18 @@ public class UserBusiness(
     {
         var user = await userRepository.GetUserById(userId);
         return mapper.Map<UserDto>(user);
+    }
+
+    public async Task<DateTime?> GetNextNotificationCheckForUser(int userId)
+    {
+        var user = await userRepository.GetUserById(userId);
+        var activeTrackersForUser =
+            await trackedLocationRepository.GetTrackedLocationsForUser(userId);
+        if (activeTrackersForUser.Count == 0 ||
+            activeTrackersForUser.All(x => x.Enabled == false))
+            return null;
+        var nextNotificationCheck = user.NextNotificationAt;
+        return nextNotificationCheck.AddMinutes(5);
     }
 
     public async Task AssignRoleForUser(int userId, Role role)

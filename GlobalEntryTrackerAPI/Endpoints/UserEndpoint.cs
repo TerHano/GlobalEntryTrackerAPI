@@ -34,5 +34,15 @@ public static class UserEndpoint
                 await userBusiness.UpdateUser(request, userId);
                 return Results.Ok();
             }).RequireAuthorization();
+
+        app.MapGet("/api/v1/next-notification",
+            async (HttpContext httpContext, UserBusiness userBusiness) =>
+            {
+                var userId = httpContext.User.GetUserId();
+
+                var nextNotificationCheck =
+                    await userBusiness.GetNextNotificationCheckForUser(userId);
+                return Results.Ok(nextNotificationCheck);
+            }).RequireAuthorization();
     }
 }

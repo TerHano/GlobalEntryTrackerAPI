@@ -14,7 +14,17 @@ public class AppointmentArchiveService(
     {
         var allAppointments = await appointmentLocationRepository.GetAllAppointmentLocations();
         var archivedAppointments = new List<ArchivedAppointmentEntity>();
-        foreach (var appointment in appointments)
+        //Get only appointments with distinct dates
+        var scanTime = DateTime.UtcNow;
+        //
+        //This is to avoid duplicates
+
+        var distinctDates = appointments
+            .GroupBy(x => DateOnly.FromDateTime(x.StartTimestamp))
+            .Select(group => group.First())
+            .ToList();
+
+        foreach (var appointment in distinctDates)
         {
             var locationDetails =
                 allAppointments.FirstOrDefault(x => x.ExternalId == appointment.ExternalLocationId);
@@ -28,9 +38,8 @@ public class AppointmentArchiveService(
             var archivedAppointment = new ArchivedAppointmentEntity
             {
                 LocationId = locationDetails.Id,
-                StartTimestamp = appointment.StartTimestamp.ToUniversalTime(),
-                EndTimestamp = appointment.EndTimestamp.ToUniversalTime(),
-                ScannedAt = DateTime.UtcNow
+                Date = DateOnly.FromDateTime(appointment.StartTimestamp),
+                ScannedAt = scanTime
             };
             archivedAppointments.Add(archivedAppointment);
         }
