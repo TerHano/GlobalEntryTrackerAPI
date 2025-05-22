@@ -61,9 +61,23 @@ public class TrackedLocationForUserRepository(
     {
         try
         {
-            var entity = context.Update(trackedLocationForUser);
+            var entity = context.UserTrackedLocations.Update(trackedLocationForUser);
             await context.SaveChangesAsync();
             return entity.Entity.Id;
+        }
+        catch (DbUpdateException ex)
+        {
+            logger.LogError(ex.Message);
+            throw new DbUpdateException("Failed to update tracker for user", ex);
+        }
+    }
+
+    public async Task UpdateTrackers(List<TrackedLocationForUserEntity> trackedLocations)
+    {
+        try
+        {
+            context.UserTrackedLocations.UpdateRange(trackedLocations);
+            await context.SaveChangesAsync();
         }
         catch (DbUpdateException ex)
         {

@@ -18,6 +18,7 @@ using Microsoft.IdentityModel.Tokens;
 using Quartz;
 using Quartz.AspNetCore;
 using Service;
+using Service.Jobs;
 using Service.Notification;
 using Stripe;
 
@@ -208,12 +209,11 @@ builder.Services.AddQuartz(q =>
     //
     // // Register jobs and triggers here (see step 3)
     // // Example: Register a job and trigger to run every 5 seconds.
-    // var jobKey = new JobKey("SampleJob");
-    // var jobKey = new JobKey("ActiveJobManagerJob");
-    // q.AddJob<ActiveJobManagerJob>(opts => opts.WithIdentity(jobKey));
-    // q.AddTrigger(opts => opts
-    //     .ForJob(jobKey)
-    //     .WithIdentity("ActiveJob-trigger").StartNow());
+    var jobKey = new JobKey("ActiveJobManagerJob");
+    q.AddJob<ActiveJobManagerJob>(opts => opts.WithIdentity(jobKey));
+    q.AddTrigger(opts => opts
+        .ForJob(jobKey)
+        .WithIdentity("ActiveJob-trigger").StartNow());
 });
 
 builder.Services.AddAuthorization(options =>

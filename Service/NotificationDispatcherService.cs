@@ -32,9 +32,12 @@ public class NotificationDispatcherService(
             await notificationManagerService.SendAppointmentAvailableNotifications(
                 validAppointments,
                 locationInformation, trackedLocationForUser.UserId);
+            trackedLocationForUser.LastSeenEarliestAppointment =
+                validAppointments.FirstOrDefault()?.StartTimestamp.ToUniversalTime();
         }
 
         await UpdateNextNotificationTimeBasedOnRole(trackersForLocation);
+        await UpdateLastSeenEarliestAppointment(trackersForLocation);
     }
 
     private async Task UpdateNextNotificationTimeBasedOnRole(
@@ -44,5 +47,12 @@ public class NotificationDispatcherService(
         foreach (var user in users) userRoleService.UpdateNextNotificationTimeForUser(user);
 
         await userRepository.UpdateMultipleUsers(users);
+    }
+
+    //Update LastSeen Earliest Appointment for each user
+    private async Task UpdateLastSeenEarliestAppointment(
+        List<TrackedLocationForUserEntity> trackers)
+    {
+        await trackedLocationForUserRepository.UpdateTrackers(trackers);
     }
 }

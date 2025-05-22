@@ -14,4 +14,5 @@ public class TrackedLocationForUserEntity
 
     public required DateTime CreatedAt { get; set; }
     public required DateTime UpdatedAt { get; set; }
+    public DateTime? LastSeenEarliestAppointment { get; set; }
 }

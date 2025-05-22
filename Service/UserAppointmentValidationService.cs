@@ -14,6 +14,12 @@ public class UserAppointmentValidationService
         const int maxDaysToNotify = 5;
         var validLocationAppointments = new List<LocationAppointmentDto>();
         var notificationType = trackedLocationForUser.NotificationType.Type;
+        //Check if first appointment is the same as the last seen appointment
+        if (locationAppointments.Count == 0)
+            return validLocationAppointments;
+        if (locationAppointments.First().StartTimestamp.ToUniversalTime() ==
+            trackedLocationForUser.LastSeenEarliestAppointment)
+            return validLocationAppointments;
         switch (notificationType)
         {
             case NotificationType.Soonest:
@@ -23,6 +29,15 @@ public class UserAppointmentValidationService
                 var daysSeen = 0;
                 foreach (var locationAppointmentDto in locationAppointments)
                 {
+                    if (validLocationAppointments.Count == 1)
+                    {
+                        if (DoesFirstValidAppointmentMatchLastSeen(validLocationAppointments[0],
+                                trackedLocationForUser))
+                        {
+                            validLocationAppointments.Clear();
+                            break;
+                        }
+                    }
                     if (lastSeenDate == locationAppointmentDto.StartTimestamp.Date &&
                         locationsSeenForDate >= maxAppointmentsForDayToNotify)
                         continue;
@@ -51,6 +66,16 @@ public class UserAppointmentValidationService
             {
                 foreach (var locationAppointmentDto in locationAppointments)
                 {
+                    if (validLocationAppointments.Count == 1)
+                    {
+                        if (DoesFirstValidAppointmentMatchLastSeen(validLocationAppointments[0],
+                                trackedLocationForUser))
+                        {
+                            validLocationAppointments.Clear();
+                            break;
+                        }
+                    }
+
                     if (locationAppointmentDto.StartTimestamp.DayOfWeek is DayOfWeek.Saturday
                         or DayOfWeek.Sunday)
                         validLocationAppointments.Add(locationAppointmentDto);
@@ -63,5 +88,13 @@ public class UserAppointmentValidationService
         }
 
         return validLocationAppointments;
+    }
+
+    private bool DoesFirstValidAppointmentMatchLastSeen(
+        LocationAppointmentDto locationAppointment,
+        TrackedLocationForUserEntity trackedLocationForUser)
+    {
+        return locationAppointment.StartTimestamp.ToUniversalTime() ==
+               trackedLocationForUser.LastSeenEarliestAppointment;
     }
 }
