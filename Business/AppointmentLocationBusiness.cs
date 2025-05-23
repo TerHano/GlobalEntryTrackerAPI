@@ -12,6 +12,8 @@ public class AppointmentLocationBusiness(
     public async Task<List<AppointmentLocationDto>> GetAllAppointmentLocations()
     {
         var locations = await appointmentLocationRepository.GetAllAppointmentLocations();
+        //Sort by city name
+        locations.Sort((x, y) => string.Compare(x.City, y.City, StringComparison.Ordinal));
         return mapper.Map<List<AppointmentLocationDto>>(locations);
     }
 

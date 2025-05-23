@@ -21,24 +21,33 @@ public class AppointmentArchiveService(
 
         var distinctDates = appointments
             .GroupBy(x => DateOnly.FromDateTime(x.StartTimestamp))
-            .Select(group => group.First())
+            //.Select(group => group.First())
             .ToList();
 
-        foreach (var appointment in distinctDates)
+        foreach (var appointmentsForDate in distinctDates)
         {
+            var externalLocationId = appointmentsForDate.FirstOrDefault()?.ExternalLocationId;
+            if (externalLocationId == null)
+            {
+                logger.LogWarning("External location ID is null for appointment on {Date}",
+                    appointmentsForDate.FirstOrDefault()?.StartTimestamp);
+                continue;
+            }
+
             var locationDetails =
-                allAppointments.FirstOrDefault(x => x.ExternalId == appointment.ExternalLocationId);
+                allAppointments.FirstOrDefault(x => x.ExternalId == externalLocationId);
             if (locationDetails == null)
             {
                 logger.LogWarning("Location details not found for external ID: {ExternalId}",
-                    appointment.ExternalLocationId);
+                    externalLocationId);
                 continue;
             }
 
             var archivedAppointment = new ArchivedAppointmentEntity
             {
                 LocationId = locationDetails.Id,
-                Date = DateOnly.FromDateTime(appointment.StartTimestamp),
+                Date = appointmentsForDate.Key,
+                NumberOfAppointments = appointmentsForDate.Count(),
                 ScannedAt = scanTime
             };
             archivedAppointments.Add(archivedAppointment);

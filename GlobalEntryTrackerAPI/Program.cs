@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Mail;
-using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using Business;
@@ -10,6 +9,7 @@ using Database.Repositories;
 using GlobalEntryTrackerAPI.Endpoints;
 using GlobalEntryTrackerAPI.Endpoints.Notifications;
 using GlobalEntryTrackerAPI.Middleware;
+using GlobalEntryTrackerAPI.Util;
 using GlobalEntryTrackerAPI.Webhooks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Json;
@@ -109,10 +109,8 @@ builder.Services.Configure<JsonOptions>(options =>
 });
 
 
-// builder.Services.AddSingleton<IUserIdProvider, NameUserIdProvider>();
 
 //Mappers
-
 builder.Services.AddAutoMapper(typeof(UserMapper).Assembly);
 
 
@@ -121,8 +119,7 @@ builder.Services.AddAutoMapper(typeof(UserMapper).Assembly);
 //builder.Services.AddScoped<IValidator<UpdateRoleSettingsRequest>, RoleSettingsRequestValidator>();
 
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+
 builder.Services.AddOpenApi();
 
 var authIssuer = builder.Configuration.GetValue<string>("Auth:Issuer");
@@ -136,17 +133,7 @@ builder.Services.AddAuthentication(options =>
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 }).AddJwtBearer(options =>
 {
-    // Configure the Authority to the expected value for
-    // the authentication provider. This ensures the token
-    // is appropriately validated.
-    //options.Authority = "AuthorityURL"; // TODO: Update URL
 
-    // Sending the access token in the query string is required when using WebSockets or ServerSentEvents
-    // due to a limitation in Browser APIs. We restrict it to only calls to the
-    // SignalR hub in this code.
-    // See https://docs.microsoft.com/aspnet/core/signalr/security#access-token-logging
-    // for more information about security considerations when using
-    // the query string to transmit the access token.
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = false,
@@ -162,36 +149,7 @@ builder.Services.AddAuthentication(options =>
         OnTokenValidated = async context =>
         {
             // Get user ID from the JWT's claims (e.g., "sub" claim)
-            var externalUserId =
-                context.Principal?.FindFirstValue(ClaimTypes
-                    .NameIdentifier); // Or other user identifier claim
-            if (string.IsNullOrEmpty(externalUserId))
-            {
-                context.Fail("User ID not found in claims");
-                return;
-            }
-
-            await using var dbContext =
-                context.HttpContext.RequestServices
-                    .GetRequiredService<GlobalEntryTrackerDbContext>();
-
-            var user = await dbContext.Users.FirstOrDefaultAsync(user =>
-                user.ExternalId.Equals(externalUserId));
-            if (user == null)
-            {
-                context.Fail("User not found");
-                return;
-            }
-
-            var userRole = await dbContext.UserRoles.Include(userRoleEntity => userRoleEntity.Role)
-                .FirstOrDefaultAsync(u => u.UserId == user.Id);
-            var claims = new List<Claim>
-            {
-                new("InternalId", user.Id.ToString())
-            };
-            if (userRole != null) claims.Add(new Claim(ClaimTypes.Role, userRole.Role.Name));
-            var identity = new ClaimsIdentity(claims);
-            context.Principal?.AddIdentity(identity);
+            await AuthUtil.OnJWTValidate(context);
         }
     };
 });
@@ -199,27 +157,28 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddQuartz(q =>
 {
     // Use a dedicated thread pool for Quartz jobs.
-    q.UseDedicatedThreadPool(tp =>
-    {
-        tp.MaxConcurrency = 10; // Adjust as needed
-    });
+    q.UseDedicatedThreadPool(tp => { tp.MaxConcurrency = 10; });
     // // Configure Quartz options (optional)
-    //q.UseMicrosoftDependencyInjectionJobFactory();
-    q.UseInMemoryStore();
-    //
-    // // Register jobs and triggers here (see step 3)
-    // // Example: Register a job and trigger to run every 5 seconds.
+
+    q.UsePersistentStore(options =>
+    {
+        options.UseProperties = false; // Use property-based storage
+        options.UseClustering(); // Enable clustering if needed
+        options.UsePostgres(connectionString); // Use SQL Server
+        options.UseNewtonsoftJsonSerializer();
+    });
+
     var jobKey = new JobKey("ActiveJobManagerJob");
     q.AddJob<ActiveJobManagerJob>(opts => opts.WithIdentity(jobKey));
     q.AddTrigger(opts => opts
         .ForJob(jobKey)
-        .WithIdentity("ActiveJob-trigger").StartNow());
+        .WithIdentity("ActiveJob-trigger").StartNow().WithSimpleSchedule(s =>
+            s.WithIntervalInHours(24)
+                .RepeatForever()));
 });
 
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("Admin", policy => policy.RequireRole("Admin"));
-});
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("Admin", policy => policy.RequireRole("Admin"));
 
 builder.Services.AddQuartzServer(options =>
 {

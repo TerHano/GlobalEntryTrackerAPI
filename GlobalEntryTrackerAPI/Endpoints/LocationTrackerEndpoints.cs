@@ -66,5 +66,14 @@ public static class LocationTrackerEndpoints
                     userId);
                 return Results.Ok(deletedId);
             }).RequireAuthorization();
+
+        app.MapDelete("/api/v1/track-location",
+            async (HttpContext httpContext,
+                UserAppointmentTrackerBusiness userAppointmentTrackerBusiness) =>
+            {
+                var userId = httpContext.User.GetUserId();
+                await userAppointmentTrackerBusiness.DeleteAllTrackersForUser(userId);
+                return Results.Ok();
+            }).RequireAuthorization();
     }
 }

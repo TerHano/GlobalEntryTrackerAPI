@@ -108,6 +108,11 @@ public class UserAppointmentTrackerBusiness(
             userId);
     }
 
+    public async Task DeleteAllTrackersForUser(int userId)
+    {
+        await trackedLocationForUserRepository.DeleteAllTrackersForUser(userId);
+    }
+
     private async Task<bool> DoesUserAlreadyHaveTrackerForLocationAndNotificationType(
         int userId, int locationId, int notificationTypeId, int trackerId = 0)
     {
