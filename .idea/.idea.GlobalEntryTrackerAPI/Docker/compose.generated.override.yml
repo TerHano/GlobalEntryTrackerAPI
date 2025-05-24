@@ -1,0 +1,20 @@
+# This is a generated file. Not intended for manual editing.
+services:
+  globalentrytrackerapi:
+    build:
+      context: "/Users/terryhanoman/RiderProjects/GlobalEntryTrackerAPI"
+      dockerfile: "GlobalEntryTrackerAPI/Dockerfile"
+      target: "base"
+    command: []
+    entrypoint:
+    - "dotnet"
+    - "/app/bin/Debug/net9.0/GlobalEntryTrackerAPI.dll"
+    environment:
+      DOTNET_USE_POLLING_FILE_WATCHER: "true"
+    image: "globalentrytrackerapi:dev"
+    ports: []
+    volumes:
+    - "/Users/terryhanoman/RiderProjects/GlobalEntryTrackerAPI/GlobalEntryTrackerAPI:/app:rw"
+    - "/Users/terryhanoman/RiderProjects/GlobalEntryTrackerAPI:/src:rw"
+    - "/Users/terryhanoman/.nuget/packages:/home/app/.nuget/packages"
+    working_dir: "/app"

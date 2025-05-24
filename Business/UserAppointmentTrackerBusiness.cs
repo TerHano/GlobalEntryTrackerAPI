@@ -9,6 +9,9 @@ using Service;
 
 namespace Business;
 
+/// <summary>
+///     Handles business logic for tracking user appointment locations.
+/// </summary>
 public class UserAppointmentTrackerBusiness(
     TrackedLocationForUserRepository trackedLocationForUserRepository,
     UserRepository userRepository,
@@ -16,6 +19,12 @@ public class UserAppointmentTrackerBusiness(
     IMapper mapper,
     ILogger<UserAppointmentTrackerBusiness> logger)
 {
+    /// <summary>
+    ///     Gets a tracked appointment location by its tracker ID and user ID.
+    /// </summary>
+    /// <param name="locationTrackerId">Tracker ID.</param>
+    /// <param name="userId">User ID.</param>
+    /// <returns>Tracked location DTO.</returns>
     public async Task<TrackedLocationForUserDto> GetTrackedAppointmentLocationById(
         int locationTrackerId, int userId)
     {
@@ -27,6 +36,11 @@ public class UserAppointmentTrackerBusiness(
         return mapper.Map<TrackedLocationForUserDto>(trackedLocation);
     }
 
+    /// <summary>
+    ///     Gets all tracked appointment locations for a user.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <returns>List of tracked location DTOs.</returns>
     public async Task<List<TrackedLocationForUserDto>> GetTrackedAppointmentLocationsForUser(
         int userId)
     {
@@ -35,6 +49,12 @@ public class UserAppointmentTrackerBusiness(
         return mapper.Map<List<TrackedLocationForUserDto>>(trackedLocations);
     }
 
+    /// <summary>
+    ///     Creates a new tracker for a user.
+    /// </summary>
+    /// <param name="request">Tracker creation request.</param>
+    /// <param name="userId">User ID.</param>
+    /// <returns>ID of the new tracker.</returns>
     public async Task<int> CreateTrackerForUser(CreateTrackerForUserRequest request, int userId)
     {
         var user = await userRepository.GetUserById(userId);
@@ -75,6 +95,12 @@ public class UserAppointmentTrackerBusiness(
         return newTracker;
     }
 
+    /// <summary>
+    ///     Updates an existing tracker for a user.
+    /// </summary>
+    /// <param name="request">Tracker update request.</param>
+    /// <param name="userId">User ID.</param>
+    /// <returns>ID of the updated tracker.</returns>
     public async Task<int> UpdateTrackerForUser(UpdateTrackerForUserRequest request, int userId)
     {
         var trackedLocation =
@@ -102,17 +128,35 @@ public class UserAppointmentTrackerBusiness(
         return await trackedLocationForUserRepository.UpdateTrackerForUser(entity);
     }
 
+    /// <summary>
+    ///     Deletes a tracker for a user.
+    /// </summary>
+    /// <param name="locationTrackerId">Tracker ID.</param>
+    /// <param name="userId">User ID.</param>
+    /// <returns>ID of the deleted tracker.</returns>
     public async Task<int> DeleteTrackerForUser(int locationTrackerId, int userId)
     {
         return await trackedLocationForUserRepository.DeleteTrackerForUser(locationTrackerId,
             userId);
     }
 
+    /// <summary>
+    ///     Deletes all trackers for a user.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
     public async Task DeleteAllTrackersForUser(int userId)
     {
         await trackedLocationForUserRepository.DeleteAllTrackersForUser(userId);
     }
 
+    /// <summary>
+    ///     Checks if a user already has a tracker for a specific location and notification type.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <param name="locationId">Location ID.</param>
+    /// <param name="notificationTypeId">Notification type ID.</param>
+    /// <param name="trackerId">Optional tracker ID to exclude from check.</param>
+    /// <returns>True if a tracker exists; otherwise, false.</returns>
     private async Task<bool> DoesUserAlreadyHaveTrackerForLocationAndNotificationType(
         int userId, int locationId, int notificationTypeId, int trackerId = 0)
     {

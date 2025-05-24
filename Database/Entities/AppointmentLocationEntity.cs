@@ -18,4 +18,5 @@ public class AppointmentLocationEntity
     [MaxLength(100)] public required string State { get; set; }
 
     [MaxLength(15)] public required string PostalCode { get; set; }
+    [MaxLength(100)] public string Timezone { get; set; }
 }

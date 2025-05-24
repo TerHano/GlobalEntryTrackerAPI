@@ -1,0 +1,60 @@
+﻿networks:
+  globalentrytracker_dev:
+    driver: bridge
+services:
+  globalentrytrackerapi:
+    image: globalentrytrackerapi
+    build:
+      context: .
+      dockerfile: GlobalEntryTrackerAPI/Dockerfile
+    #    image: globalentrytrackerapi:dev
+    depends_on:
+      - "globalentrytracker_db"
+    container_name: globalentrytrackerapi
+    ports:
+      - "5145:80"
+    restart: always
+    environment:
+      - Allowed_Origins=${ALLOWED_ORIGINS}
+      - Aspnetcore_Environment=${ASPNETCORE_ENVIRONMENT}
+      - ASPNETCORE_URLS=http://+:80
+      - Logging__Loglevel__Default=${LOGGING__LOGLEVEL__DEFAULT}
+      - Logging__Loglevel__Microsoft__Aspnetcore=${LOGGING__LOGLEVEL__MICROSOFT_ASPNETCORE}
+      - Auth__Issuer=${AUTH__ISSUER}
+      - Auth__Audience=${AUTH__AUDIENCE}
+      - Auth__Signing_Key=${AUTH__SIGNING_KEY}
+      - Auth__Supabase_Url=${AUTH__SUPABASE_URL}
+      - Auth__Supabase_Anon_Key=${AUTH__SUPABASE_ANON_KEY}
+      - Auth__Supabase_Service_Key=${AUTH__SUPABASE_SERVICE_KEY}
+      - Smtp__Host=${SMTP__HOST}
+      - Smtp__Port=${SMTP__PORT}
+      - Smtp__Username=${SMTP__USERNAME}
+      - Smtp__Password=${SMTP__PASSWORD}
+      - Smtp__From_Address=${SMTP__FROM_ADDRESS}
+      - Smtp__From_Name=${SMTP__FROM_NAME}
+      - Stripe__Secret_Key=${STRIPE__SECRET_KEY}
+      - Stripe__Webhook_Secret=${STRIPE__WEBHOOK_SECRET}
+      - Jobs__Location_Fetch_Interval_In_Minutes=${JOBS__LOCATION_FETCH_INTERVAL_IN_MINUTES}
+      - Database__Username=${DATABASE__USERNAME}
+      - Database__Password=${DATABASE__PASSWORD}
+      - Database__Name=${DATABASE__NAME}
+      - Database__Server=globalentrytracker_db
+      - Database__Port=5432
+    networks:
+      - globalentrytracker_dev
+  globalentrytracker_db:
+    image: postgres:latest
+    container_name: globalentrytracker_db
+    environment:
+      - POSTGRES_USER=${DATABASE__USERNAME}
+      - POSTGRES_PASSWORD=${DATABASE__PASSWORD}
+      - POSTGRES_DB=${DATABASE__NAME}
+    ports:
+      - "5450:5432"
+    restart: always
+    volumes:
+      - globalentrytracker_data:/var/lib/postgresql/data
+    networks:
+      - globalentrytracker_dev
+volumes:
+  globalentrytracker_data:

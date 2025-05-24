@@ -5,6 +5,12 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{F6960606-56B9-4FE9-B13D-F1CFCD4A6D94}"
 	ProjectSection(SolutionItems) = preProject
 		compose.yaml = compose.yaml
+		compose.hosted.yaml = compose.hosted.yaml
+		.gitignore = .gitignore
+		.env = .env
+		docker.env = docker.env
+		development.env = development.env
+		production.env = production.env
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Database", "Database\Database.csproj", "{B8BB7B1C-DD9A-4347-BFF7-F5D01906BFE1}"

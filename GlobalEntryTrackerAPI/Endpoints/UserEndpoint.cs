@@ -45,11 +45,11 @@ public static class UserEndpoint
 
         // PUT: api/v1/me Update Current User's Details
         app.MapPut("/api/v1/me",
-                async (HttpContext httpContext, UserBusiness userBusiness,
+                async (HttpContext httpContext, AuthBusiness authBusiness,
                     UpdateUserRequest request) =>
                 {
                     var userId = httpContext.User.GetUserId();
-                    await userBusiness.UpdateUser(request, userId);
+                    await authBusiness.UpdateUser(request, userId);
                     return Results.Ok();
                 })
             .RequireAuthorization()

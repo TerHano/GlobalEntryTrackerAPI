@@ -15,6 +15,8 @@ public class PlanOptionDto
 
     [Required] public long Price { get; set; }
 
+    [Required] public string PriceFormatted { get; set; } = null!;
+
     [Required] public string Currency { get; set; } = null!;
 
     [Required] public List<string> Features { get; set; } = null!;

@@ -3,6 +3,7 @@ using Business.Dto.Requests;
 using Database.Entities;
 using Database.Enums;
 using Database.Repositories;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Service;
 using Stripe;
@@ -10,13 +11,23 @@ using Stripe.Checkout;
 
 namespace Business;
 
+/// <summary>
+///     Handles business logic for user subscriptions and Stripe integration.
+/// </summary>
 public class SubscriptionBusiness(
     UserCustomerRepository userCustomerRepository,
     UserRoleRepository userRoleRepository,
     UserRepository userRepository,
     UserRoleService userRoleService,
+    IConfiguration configuration,
     ILogger<SubscriptionBusiness> logger)
 {
+    /// <summary>
+    ///     Creates a Stripe Checkout session for a subscription payment.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <param name="request">Checkout session request.</param>
+    /// <returns>Stripe Checkout session URL.</returns>
     public async Task<string> GetSubscriptionPaymentUrl(int userId,
         CreateCheckoutSessionRequest request)
     {
@@ -49,6 +60,12 @@ public class SubscriptionBusiness(
         return session.Url;
     }
 
+    /// <summary>
+    ///     Gets the Stripe subscription management portal URL for a user.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <param name="request">Management session request.</param>
+    /// <returns>Stripe Billing Portal session URL.</returns>
     public async Task<string> GetSubscriptionManagementUrl(int userId,
         ManageSubscriptionSessionRequest request)
     {
@@ -65,6 +82,11 @@ public class SubscriptionBusiness(
         return session.Url;
     }
 
+    /// <summary>
+    ///     Validates if a user has an active subscription and updates their role.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <returns>True if the user has an active subscription; otherwise, false.</returns>
     public async Task<bool> ValidatePurchaseForUser(int userId)
     {
         var userCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
@@ -73,7 +95,8 @@ public class SubscriptionBusiness(
         var service = new SubscriptionService();
         var subscription = await service.GetAsync(userCustomer.SubscriptionId);
         //User has a valid and active subscription
-        if (subscription.Status.Equals("active"))
+        if (subscription.Status.Equals("active") || subscription.Status.Equals(
+                "trialing"))
         {
             await userRoleRepository.AddEditRoleForUser(userId, Role.Subscriber);
             return true;
@@ -83,6 +106,11 @@ public class SubscriptionBusiness(
         return false;
     }
 
+    /// <summary>
+    ///     Retrieves subscription information for a user.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <returns>User subscription DTO or null.</returns>
     public async Task<UserSubscriptionDto?> GetSubscriptionInformationForUser(int userId)
     {
         var freePlanInformation = new UserSubscriptionDto
@@ -113,8 +141,18 @@ public class SubscriptionBusiness(
             paymentId = customer.InvoiceSettings.DefaultPaymentMethodId;
         }
 
-        var paymentService = new PaymentMethodService();
-        var paymentMethodAsync = paymentService.GetAsync(paymentId);
+        Task<PaymentMethod?> paymentMethodAsync;
+
+        if (paymentId == null)
+        {
+            paymentMethodAsync = Task.FromResult<PaymentMethod?>(null);
+        }
+        else
+        {
+            var paymentService = new PaymentMethodService();
+            paymentMethodAsync = paymentService.GetAsync(paymentId);
+        }
+
         var latestSubscriptionItem = subscription.Items.Data.FirstOrDefault();
         if (latestSubscriptionItem == null)
             throw new NullReferenceException("Subscription item not found");
@@ -126,7 +164,7 @@ public class SubscriptionBusiness(
 
 
         var paymentMethod = await paymentMethodAsync;
-        var card = paymentMethod.Card;
+        var card = paymentMethod?.Card;
 
         //Get Product Info
         var productService = new ProductService();
@@ -134,12 +172,12 @@ public class SubscriptionBusiness(
         if (product == null)
             throw new NullReferenceException("Product not found");
         //Get Product Metadata
-
-        if (!subscription.Status.Equals("active")) return freePlanInformation;
+        var subssciptionStatus = subscription.Status;
+        if (subssciptionStatus.Equals("canceled")) return freePlanInformation;
 
         var userSubscription = new UserSubscriptionDto
         {
-            ActiveBilledSubscription = true,
+            ActiveBilledSubscription = subssciptionStatus == "active",
             PlanName = product.Name,
             PlanPrice = latestSubscriptionItem.Price.UnitAmount ?? 0,
             Currency = latestSubscriptionItem.Price.Currency,
@@ -147,17 +185,22 @@ public class SubscriptionBusiness(
             NextPaymentDate =
                 subscriptionEndDate,
             IsEnding = subscription.CanceledAt != null,
-            CardLast4Digits = card.Last4,
-            CardBrand = card.Brand
+            CardLast4Digits = card?.Last4,
+            CardBrand = card?.Brand
         };
         return userSubscription;
     }
 
+    /// <summary>
+    ///     Handles Stripe webhook events for subscription creation and deletion.
+    /// </summary>
+    /// <param name="stripeSignature">Stripe signature header.</param>
+    /// <param name="jsonBody">Raw JSON body of the webhook event.</param>
     public async Task HandleStripeWebhookEvents(string stripeSignature,
         string jsonBody)
     {
         var stripeWebhookSecret =
-            Environment.GetEnvironmentVariable("Stripe__WebhookSecret");
+            configuration["Stripe:Webhook_Secret"] ?? null;
 
         //Get request body
         try
@@ -232,5 +275,47 @@ public class SubscriptionBusiness(
             throw new ApplicationException(
                 "Error processing subscription event, please try again later");
         }
+    }
+
+    public async Task GrantSubscriptionToUser(GrantSubscriptionRequest request)
+    {
+        var user = await userRepository.GetUserById(request.UserId);
+        var customerService = new CustomerService();
+        var customer = await customerService.CreateAsync(
+            new CustomerCreateOptions
+            {
+                Email = user.Email,
+                Name = user.FirstName + " " + user.LastName
+            });
+        if (customer == null)
+            throw new NullReferenceException("Customer creation failed");
+        var subscriptionService = new SubscriptionService();
+        var subscription = await subscriptionService.CreateAsync(
+            new SubscriptionCreateOptions
+            {
+                Customer = customer.Id,
+                TrialEnd = DateTime.UtcNow.AddYears(1),
+                TrialFromPlan = true,
+                TrialSettings =
+                {
+                    EndBehavior =
+                    {
+                        MissingPaymentMethod = "cancel"
+                    }
+                },
+                Items =
+                [
+                    new SubscriptionItemOptions
+                    {
+                        Price = request.PriceId
+                    }
+                ],
+                Metadata = new Dictionary<string, string>
+                {
+                    { "userId", request.UserId.ToString() }
+                }
+            });
+        if (subscription == null)
+            throw new NullReferenceException("Subscription creation failed");
     }
 }

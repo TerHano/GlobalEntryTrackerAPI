@@ -2,7 +2,7 @@ using System.Net.Mail;
 using System.Text;
 using Database.Entities;
 using Database.Entities.NotificationSettings;
-using Database.Repositories;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Service.Dto;
 
@@ -10,7 +10,7 @@ namespace Service.Notification;
 
 public class EmailNotificationService(
     SmtpClient smtpClient,
-    UserNotificationRepository userNotificationRepository,
+    IConfiguration configuration,
     ILogger<EmailNotificationService> logger) : INotificationService
 {
     public async Task SendTestNotification<T>(T settingsToTest)
@@ -70,9 +70,9 @@ public class EmailNotificationService(
     private MailMessage GenerateEmailMessage(string to, string subject, string body)
     {
         var fromAddress =
-            Environment.GetEnvironmentVariable("Smtp__FromAddress");
+            configuration["Smtp:From_Address"] ?? null;
         var fromName =
-            Environment.GetEnvironmentVariable("Smtp__FromName");
+            configuration["Smtp:From_Name"] ?? null;
         if (fromAddress == null || fromName == null)
             throw new ApplicationException(
                 "From address or name is not set in environment variables");

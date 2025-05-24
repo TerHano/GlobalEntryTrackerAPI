@@ -1,5 +1,5 @@
 using System.ComponentModel.DataAnnotations;
-using Database.Enums;
+using Business.Dto.Admin;
 
 namespace Business.Dto;
 
@@ -11,5 +11,5 @@ public class UserDto
 
     [Required] public string Email { get; set; }
 
-    [Required] public Role Role { get; set; }
+    [Required] public RoleDto Role { get; set; }
 }

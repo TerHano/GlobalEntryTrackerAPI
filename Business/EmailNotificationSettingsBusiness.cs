@@ -8,12 +8,20 @@ using Service.Enum;
 
 namespace Business;
 
+/// <summary>
+///     Handles business logic for email notification settings.
+/// </summary>
 public class EmailNotificationSettingsBusiness(
     UserNotificationRepository userNotificationRepository,
     NotificationManagerService notificationManager,
     UserRepository userRepository,
     IMapper mapper)
 {
+    /// <summary>
+    ///     Gets the email notification settings for a user.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <returns>Email notification settings DTO or null.</returns>
     public async Task<EmailNotificationSettingsDto?> GetEmailNotificationSettingsForUser(
         int userId)
     {
@@ -23,6 +31,12 @@ public class EmailNotificationSettingsBusiness(
         return mapper.Map<EmailNotificationSettingsDto>(userNotification.EmailNotificationSettings);
     }
 
+    /// <summary>
+    ///     Creates email notification settings for a user.
+    /// </summary>
+    /// <param name="settings">Settings request.</param>
+    /// <param name="userId">User ID.</param>
+    /// <returns>ID of the created settings.</returns>
     public async Task<int> CreateEmailNotificationSettingsForUser(
         CreateEmailNotificationSettingsRequest settings, int userId)
     {
@@ -34,6 +48,12 @@ public class EmailNotificationSettingsBusiness(
         return id;
     }
 
+    /// <summary>
+    ///     Updates email notification settings for a user.
+    /// </summary>
+    /// <param name="settings">Settings request.</param>
+    /// <param name="userId">User ID.</param>
+    /// <returns>ID of the updated settings.</returns>
     public async Task<int> UpdateEmailNotificationSettingsForUser(
         UpdateEmailNotificationSettingsRequest settings, int userId)
     {
@@ -45,6 +65,10 @@ public class EmailNotificationSettingsBusiness(
         return id;
     }
 
+    /// <summary>
+    ///     Sends a test email message to the user.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
     public async Task SendEmailTestMessage(int userId)
     {
         var user = await userRepository.GetUserById(userId);

@@ -1,4 +1,5 @@
 using Database.Entities;
+using Database.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -8,6 +9,13 @@ public class UserRepository(
     IDbContextFactory<GlobalEntryTrackerDbContext> contextFactory,
     ILogger<UserRepository> logger)
 {
+    //Get All Users
+    public async Task<List<UserEntity>> GetAllUsers()
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        return await context.Users.Include(x => x.UserRole).ThenInclude(x => x.Role).ToListAsync();
+    }
+
     public async Task CreateUser(UserEntity user)
     {
         try
@@ -77,5 +85,29 @@ public class UserRepository(
             logger.LogError(ex.Message);
             throw new DbUpdateException("Failed to delete user", ex);
         }
+    }
+
+    /// <summary>
+    ///     Checks if the user has the admin role.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <returns>True if the user is an admin, otherwise false.</returns>
+    public async Task<bool> IsUserAdmin(int userId)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        var user = await context.Users
+            .Include(x => x.UserRole)
+            .ThenInclude(x => x.Role)
+            .FirstOrDefaultAsync(x => x.Id == userId);
+        return user?.UserRole?.Role.Code == Role.Admin.GetCode();
+    }
+
+    //get users for admin
+    public async Task<List<UserEntity>> GetAllUsersForAdmin()
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        return await context.Users.Include(x => x.UserRole).ThenInclude(x => x.Role)
+            .Include(x => x.UserCustomer)
+            .OrderByDescending(x => x.CreatedAt).ToListAsync();
     }
 }

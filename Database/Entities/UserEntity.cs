@@ -18,6 +18,7 @@ public class UserEntity
 
     public virtual UserRoleEntity UserRole { get; set; }
     public virtual UserNotificationEntity UserNotification { get; set; }
+    public virtual UserCustomerEntity UserCustomer { get; set; }
 
     public required DateTime NextNotificationAt { get; set; }
 }

@@ -1,18 +1,17 @@
 using AutoMapper;
 using Business.Dto;
+using Business.Dto.Admin;
 using Business.Dto.NotificationSettings;
-using Business.Dto.Requests;
 using Database.Entities;
-using Database.Entities.NotificationSettings;
 using Database.Enums;
 using Database.Repositories;
 using Quartz;
-using Supabase.Gotrue;
-using Supabase.Gotrue.Interfaces;
-using Client = Supabase.Client;
 
 namespace Business;
 
+/// <summary>
+///     Handles business logic for user management and user-related operations.
+/// </summary>
 public class UserBusiness(
     TrackedLocationForUserRepository trackedLocationRepository,
     UserRepository userRepository,
@@ -21,74 +20,39 @@ public class UserBusiness(
     ISchedulerFactory schedulerFactory,
     IMapper mapper)
 {
-    public async Task CreateUser(CreateUserRequest request)
+    /// <summary>
+    ///     Gets all users
+    /// </summary>
+    public async Task<List<UserDto>> GetAllUsers()
     {
-        var supabaseClient = await GetSupabaseClient();
-        var signUpOptions = new SignUpOptions
-        {
-            RedirectTo = request.RedirectUrl,
-            Data = new Dictionary<string, object>
-            {
-                { "first_name", request.FirstName }, { "last_name", request.LastName }
-            }
-        };
-        var response =
-            await supabaseClient.Auth.SignUp(request.Email, request.Password, signUpOptions);
-        var supabaseUser = response?.User;
-        if (supabaseUser == null) throw new Exception("User could not be created");
-        var newUser = new UserEntity
-        {
-            Id = 0,
-            ExternalId = supabaseUser.Id,
-            Email = request.Email,
-            FirstName = request.FirstName,
-            LastName = request.LastName,
-            CreatedAt = DateTime.UtcNow,
-            NextNotificationAt = DateTime.UtcNow
-        };
-        await userRepository.CreateUser(newUser);
-        var newUserRole = new UserRoleEntity
-        {
-            UserId = newUser.Id,
-            RoleId = (int)Role.Free
-        };
-        await userRoleRepository.CreateUserRole(newUserRole);
-        var notificationId = await userNotificationRepository.CreateUserNotification(newUser.Id);
-        await userNotificationRepository.UpdateUserEmailNotificationSettings(newUser.Id,
-            new EmailNotificationSettingsEntity
-            {
-                UserNotificationId = notificationId,
-                Email = request.Email,
-                Enabled = false
-            });
+        var users = await userRepository.GetAllUsers();
+        return mapper.Map<List<UserDto>>(users);
     }
 
-    public async Task UpdateUser(UpdateUserRequest request, int userId)
+    //get all users for admin
+    public async Task<List<UserDtoForAdmin>> GetAllUsersForAdmin()
     {
-        var user = await userRepository.GetUserById(userId);
-        if (user == null) throw new Exception("User not found");
-        user.FirstName = request.FirstName;
-        user.LastName = request.LastName;
-        await userRepository.UpdateUser(user);
-        var supabaseAdminClient = await GetSupabaseAdminClient();
-        await supabaseAdminClient.UpdateUserById(user.ExternalId,
-            new AdminUserAttributes
-            {
-                UserMetadata = new Dictionary<string, object>
-                {
-                    { "first_name", request.FirstName },
-                    { "last_name", request.LastName }
-                }
-            });
-        mapper.Map(request, user);
+        var users = await userRepository.GetAllUsersForAdmin();
+        return mapper.Map<List<UserDtoForAdmin>>(users);
     }
 
+
+    /// <summary>
+    ///     Gets a user by their ID.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <returns>User DTO.</returns>
     public async Task<UserDto> GetUserById(int userId)
     {
         var user = await userRepository.GetUserById(userId);
         return mapper.Map<UserDto>(user);
     }
 
+    /// <summary>
+    ///     Gets the next notification check time for a user.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <returns>DateTime of the next notification check, or null.</returns>
     public async Task<DateTime?> GetNextNotificationCheckForUser(int userId)
     {
         var user = await userRepository.GetUserById(userId);
@@ -101,6 +65,11 @@ public class UserBusiness(
         return nextNotificationCheck.AddMinutes(5);
     }
 
+    /// <summary>
+    ///     Assigns a role to a user.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <param name="role">Role to assign.</param>
     public async Task AssignRoleForUser(int userId, Role role)
     {
         var newUserRole = new UserRoleEntity
@@ -111,6 +80,11 @@ public class UserBusiness(
         await userRoleRepository.CreateUserRole(newUserRole);
     }
 
+    /// <summary>
+    ///     Gets permissions for a user.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <returns>Permissions DTO.</returns>
     public async Task<PermissionsDto> GetPermissionsForUser(int userId)
     {
         var trackersForUser = await trackedLocationRepository.GetTrackedLocationsForUser(userId);
@@ -124,7 +98,11 @@ public class UserBusiness(
         return permissions;
     }
 
-
+    /// <summary>
+    ///     Checks if the user has any notifications set up.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <returns>Notification check DTO.</returns>
     public async Task<NotificationCheckDto> DoesUserHaveNotificationsSetUp(int userId)
     {
         var userNotification =
@@ -138,6 +116,11 @@ public class UserBusiness(
         };
     }
 
+    /// <summary>
+    ///     Gets all notification settings for a user.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <returns>User notification settings DTO.</returns>
     public async Task<UserNotificationSettingsDto> GetAllNotificationsForUser(int userId)
     {
         var user = await userNotificationRepository.GetUserWithNotificationSettings(userId);
@@ -151,29 +134,14 @@ public class UserBusiness(
         return userNotificationSettingsDto;
     }
 
-    public async Task DeleteUserById(int userId)
-    {
-        var user = await userRepository.GetUserById(userId);
-        var supabaseAdminClient = await GetSupabaseAdminClient();
-        var response = await supabaseAdminClient.DeleteUser(user.ExternalId);
-        if (response == null) throw new Exception("User could not be deleted");
-        await userRepository.DeleteUser(userId);
-    }
 
-    private async Task<Client> GetSupabaseClient()
+    /// <summary>
+    ///     Checks if the user has the admin role.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <returns>True if the user is an admin, otherwise false.</returns>
+    public async Task<bool> IsUserAdmin(int userId)
     {
-        var supabaseUrl = Environment.GetEnvironmentVariable("Auth__SupabaseUrl");
-        var supabaseKey = Environment.GetEnvironmentVariable("Auth__SupabaseAnonKey");
-        var supabaseClient = new Client(supabaseUrl, supabaseKey);
-        await supabaseClient.InitializeAsync();
-        return supabaseClient;
-    }
-
-    private async Task<IGotrueAdminClient<User>> GetSupabaseAdminClient()
-    {
-        var supabaseServiceKey = Environment.GetEnvironmentVariable("Auth__SupabaseServiceKey");
-
-        var supabaseClient = await GetSupabaseClient();
-        return supabaseClient.AdminAuth(supabaseServiceKey);
+        return await userRepository.IsUserAdmin(userId);
     }
 }

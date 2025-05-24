@@ -26,9 +26,9 @@ using Stripe;
 var builder = WebApplication.CreateBuilder(args);
 
 const string globalEntryTrackerPolicy = "GlobalEntryTrackerPolicy";
-var allowedOrigins = builder.Configuration.GetValue<string>("AllowedOrigins") ?? "";
+var allowedOrigins = builder.Configuration.GetValue<string>("Allowed_Origins") ?? "";
 
-StripeConfiguration.ApiKey = builder.Configuration.GetValue<string>("Stripe:SecretKey") ??
+StripeConfiguration.ApiKey = builder.Configuration.GetValue<string>("Stripe:Secret_Key") ??
                              throw new Exception("Stripe Secret Key is missing.");
 
 builder.Services.AddCors(options =>
@@ -43,9 +43,16 @@ builder.Services.AddCors(options =>
         });
 });
 
-
-var connectionString = builder.Configuration.GetValue<string>("Database:ConnectionString");
-if (string.IsNullOrEmpty(connectionString)) throw new Exception("ConnectionString is missing.");
+var dbUsername = builder.Configuration.GetValue<string>("Database:Username");
+var dbPassword = builder.Configuration.GetValue<string>("Database:Password");
+var dbServer = builder.Configuration.GetValue<string>("Database:Server");
+var dbPort = builder.Configuration.GetValue<int?>("Database:Port");
+var dbName = builder.Configuration.GetValue<string>("Database:Name");
+if (string.IsNullOrEmpty(dbUsername) || string.IsNullOrEmpty(dbPassword) ||
+    string.IsNullOrEmpty(dbServer) || string.IsNullOrEmpty(dbName) || dbPort == null)
+    throw new Exception("Application Database configuration is missing.");
+var connectionString =
+    $"Host={dbServer};Port={dbPort};Database={dbName};Username={dbUsername};Password={dbPassword};";
 
 builder.Services.AddDbContextFactory<GlobalEntryTrackerDbContext>(opt =>
 {
@@ -64,6 +71,7 @@ builder.Services.AddScoped<UserCustomerRepository>();
 builder.Services.AddScoped<PlanOptionRepository>();
 builder.Services.AddScoped<UserNotificationRepository>();
 builder.Services.AddScoped<ArchivedAppointmentsRepository>();
+builder.Services.AddScoped<RoleRepository>();
 
 
 //builder.Services.AddScoped<JwtService>();
@@ -77,6 +85,8 @@ builder.Services.AddScoped<NotificationManagerService>();
 builder.Services.AddScoped<NotificationDispatcherService>();
 builder.Services.AddScoped<SubscriptionBusiness>();
 builder.Services.AddScoped<PlanBusiness>();
+builder.Services.AddScoped<AuthBusiness>();
+builder.Services.AddScoped<RoleBusiness>();
 
 builder.Services.AddScoped<UserAppointmentValidationService>();
 builder.Services.AddScoped<DiscordNotificationService>();
@@ -116,10 +126,6 @@ builder.Services.Configure<JsonOptions>(options =>
 builder.Services.AddAutoMapper(typeof(UserMapper).Assembly);
 
 
-//Validators
-//builder.Services.AddScoped<IValidator<PlayerDTO>, PlayerDTOValidator>();
-//builder.Services.AddScoped<IValidator<UpdateRoleSettingsRequest>, RoleSettingsRequestValidator>();
-
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -154,9 +160,10 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+
 var authIssuer = builder.Configuration.GetValue<string>("Auth:Issuer");
 var authAudience = builder.Configuration.GetValue<string>("Auth:Audience");
-var authSigningKey = builder.Configuration.GetValue<string>("Auth:SigningKey");
+var authSigningKey = builder.Configuration.GetValue<string>("Auth:Signing_Key");
 builder.Services.AddAuthentication(options =>
 {
     // Identity made Cookie authentication the default.
@@ -169,7 +176,7 @@ builder.Services.AddAuthentication(options =>
     {
         ValidateIssuer = false,
         ValidateAudience = false,
-        ValidateLifetime = false,
+        ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
         ValidIssuer = authIssuer,
         //ValidAudience = authAudience,
@@ -191,13 +198,17 @@ builder.Services.AddQuartz(q =>
     q.UseDedicatedThreadPool(tp => { tp.MaxConcurrency = 10; });
     // // Configure Quartz options (optional)
 
-    q.UsePersistentStore(options =>
-    {
-        options.UseProperties = false; // Use property-based storage
-        options.UseClustering(); // Enable clustering if needed
-        options.UsePostgres(connectionString); // Use SQL Server
-        options.UseNewtonsoftJsonSerializer();
-    });
+    q.UseInMemoryStore();
+
+    // q.UsePersistentStore(options =>
+    // {
+    //     
+    //     options.UseProperties = false; // Use property-based storage
+    //     //use memory store for testing
+    //     options.UseClustering(); // Enable clustering if needed
+    //     options.UsePostgres(connectionString); // Use SQL Server
+    //     options.UseNewtonsoftJsonSerializer();
+    // });
 
     var jobKey = new JobKey("ActiveJobManagerJob");
     q.AddJob<ActiveJobManagerJob>(opts => opts.WithIdentity(jobKey));
@@ -219,11 +230,21 @@ builder.Services.AddQuartzServer(options =>
 
 var app = builder.Build();
 
+// Place this before app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    var token = context.Request.Cookies["access_token"];
+    if (!string.IsNullOrEmpty(token)) context.Request.Headers["Authorization"] = $"Bearer {token}";
+    await next();
+});
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment()) app.UseSwagger();
 
 app.UseHttpsRedirection();
 //app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
+
+app.UseCors(globalEntryTrackerPolicy);
 
 app.UseMiddleware<ApiResponseMiddleware>();
 
@@ -243,6 +264,5 @@ app.MapEmailNotificationEndpoints();
 
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseCors(globalEntryTrackerPolicy);
 
 app.Run();

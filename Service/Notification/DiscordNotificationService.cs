@@ -78,12 +78,6 @@ public class DiscordNotificationService(
             fields.Add(dateField);
         }
 
-        // fields.AddRange(appointments.Select(locationAppointmentDto =>
-        //     new DiscordWebhookMessageDto.Field
-        //     {
-        //         Name = "Appointment",
-        //         Value = locationAppointmentDto.StartTimestamp.ToString("MMM dd, yyyy hh:mm tt")
-        //     }));
         return fields;
     }
 

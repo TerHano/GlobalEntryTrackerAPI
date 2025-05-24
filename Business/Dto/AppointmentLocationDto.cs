@@ -17,4 +17,5 @@ public class AppointmentLocationDto
     [Required] [MaxLength(100)] public required string State { get; set; }
 
     [Required] [MaxLength(15)] public required string PostalCode { get; set; }
+    [Required] [MaxLength(100)] public required string Timezone { get; set; }
 }

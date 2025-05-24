@@ -86,6 +86,6 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
 
         modelBuilder.Entity<UserCustomerEntity>()
             .HasOne(e => e.User)
-            .WithOne();
+            .WithOne(e => e.UserCustomer);
     }
 }
