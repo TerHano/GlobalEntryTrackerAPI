@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using Quartz;
 using Quartz.AspNetCore;
 using Service;
@@ -46,11 +47,13 @@ builder.Services.AddCors(options =>
 var connectionString = builder.Configuration.GetValue<string>("Database:ConnectionString");
 if (string.IsNullOrEmpty(connectionString)) throw new Exception("ConnectionString is missing.");
 
-builder.Services.AddDbContextPool<GlobalEntryTrackerDbContext>(opt =>
+builder.Services.AddDbContextFactory<GlobalEntryTrackerDbContext>(opt =>
 {
     opt.UseNpgsql(connectionString);
     opt.EnableSensitiveDataLogging();
 });
+
+builder.Services.AddMemoryCache();
 
 builder.Services.AddScoped<AppointmentLocationRepository>();
 builder.Services.AddScoped<TrackedLocationForUserRepository>();
@@ -109,7 +112,6 @@ builder.Services.Configure<JsonOptions>(options =>
 });
 
 
-
 //Mappers
 builder.Services.AddAutoMapper(typeof(UserMapper).Assembly);
 
@@ -118,9 +120,39 @@ builder.Services.AddAutoMapper(typeof(UserMapper).Assembly);
 //builder.Services.AddScoped<IValidator<PlayerDTO>, PlayerDTOValidator>();
 //builder.Services.AddScoped<IValidator<UpdateRoleSettingsRequest>, RoleSettingsRequestValidator>();
 
-
-
-builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Global Entry Tracker API",
+        Version = "v1",
+        Description = "API for Global Entry Tracker"
+    });
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "JWT Authorization header using the Bearer scheme."
+    });
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            []
+        }
+    });
+});
 
 var authIssuer = builder.Configuration.GetValue<string>("Auth:Issuer");
 var authAudience = builder.Configuration.GetValue<string>("Auth:Audience");
@@ -133,7 +165,6 @@ builder.Services.AddAuthentication(options =>
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 }).AddJwtBearer(options =>
 {
-
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = false,
@@ -189,7 +220,7 @@ builder.Services.AddQuartzServer(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment()) app.MapOpenApi();
+if (app.Environment.IsDevelopment()) app.UseSwagger();
 
 app.UseHttpsRedirection();
 //app.UseMiddleware<GlobalExceptionHandlerMiddleware>();

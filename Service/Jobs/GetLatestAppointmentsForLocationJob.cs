@@ -30,9 +30,14 @@ public class GetLatestAppointmentsForLocationJob(
                 JsonSerializer.Deserialize<List<LocationAppointmentDto>>(jsonContent,
                     _jsonSerializerOptions);
             if (locationAppointments == null || locationAppointments.Count == 0) return;
-            await appointmentArchiveService.ArchiveAppointments(locationAppointments);
-            await notificationDispatcherService.SendNotificationForLocation(locationAppointments,
+
+            var scanTime = DateTime.UtcNow;
+            var archiveTask =
+                appointmentArchiveService.ArchiveAppointments(locationAppointments, scanTime);
+            var notificationTask = notificationDispatcherService.SendNotificationForLocation(
+                locationAppointments,
                 externalLocationId);
+            await Task.WhenAll(archiveTask, notificationTask);
         }
     }
 }

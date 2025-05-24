@@ -1,7 +1,10 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Business.Dto.Requests;
 
 public class UpdateEmailNotificationSettingsRequest
 {
-    public int Id { get; set; }
-    public bool Enabled { get; set; }
+    [Required] public int Id { get; set; }
+
+    [Required] public bool Enabled { get; set; }
 }

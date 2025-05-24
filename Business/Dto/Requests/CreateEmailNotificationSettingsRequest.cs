@@ -1,6 +1,8 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Business.Dto.Requests;
 
 public class CreateEmailNotificationSettingsRequest
 {
-    public bool Enabled { get; set; }
+    [Required] public bool Enabled { get; set; }
 }

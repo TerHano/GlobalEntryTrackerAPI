@@ -10,14 +10,12 @@ public class AppointmentArchiveService(
     AppointmentLocationRepository appointmentLocationRepository,
     ILogger<AppointmentArchiveService> logger)
 {
-    public async Task ArchiveAppointments(List<LocationAppointmentDto> appointments)
+    public async Task ArchiveAppointments(List<LocationAppointmentDto> appointments,
+        DateTime scanTime)
     {
         var allAppointments = await appointmentLocationRepository.GetAllAppointmentLocations();
         var archivedAppointments = new List<ArchivedAppointmentEntity>();
-        //Get only appointments with distinct dates
-        var scanTime = DateTime.UtcNow;
-        //
-        //This is to avoid duplicates
+
 
         var distinctDates = appointments
             .GroupBy(x => DateOnly.FromDateTime(x.StartTimestamp))

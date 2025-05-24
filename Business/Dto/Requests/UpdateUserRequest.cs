@@ -1,7 +1,10 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Business.Dto.Requests;
 
 public class UpdateUserRequest
 {
-    public string FirstName { get; set; }
-    public string LastName { get; set; }
+    [Required] public string FirstName { get; set; }
+
+    [Required] public string LastName { get; set; }
 }

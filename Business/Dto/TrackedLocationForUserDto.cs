@@ -1,11 +1,18 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Business.Dto;
 
 public class TrackedLocationForUserDto
 {
-    public int Id { get; set; }
-    public AppointmentLocationDto Location { get; set; }
-    public bool Enabled { get; set; }
-    public NotificationTypeDto NotificationType { get; set; }
-    public DateOnly CutOffDate { get; set; }
+    [Required] public int Id { get; set; }
+
+    [Required] public AppointmentLocationDto Location { get; set; }
+
+    [Required] public bool Enabled { get; set; }
+
+    [Required] public NotificationTypeDto NotificationType { get; set; }
+
+    [Required] public DateOnly CutOffDate { get; set; }
+
     public DateTime? LastSeenEarliestAppointment { get; set; }
 }

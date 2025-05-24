@@ -1,6 +1,8 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Business.Dto.Requests;
 
 public class TestDiscordSettingsRequest
 {
-    public string WebhookUrl { get; set; }
+    [Required] public string WebhookUrl { get; set; }
 }

@@ -4,17 +4,17 @@ namespace Business.Dto;
 
 public class AppointmentLocationDto
 {
-    public int Id { get; init; }
+    [Required] public int Id { get; init; }
 
-    [MaxLength(100)] public required string Name { get; set; }
+    [Required] [MaxLength(100)] public required string Name { get; set; }
 
-    [MaxLength(100)] public required string Address { get; set; }
+    [Required] [MaxLength(100)] public required string Address { get; set; }
 
     [MaxLength(100)] public string? AddressAdditional { get; set; }
 
-    [MaxLength(100)] public required string City { get; set; }
+    [Required] [MaxLength(100)] public required string City { get; set; }
 
-    [MaxLength(100)] public required string State { get; set; }
+    [Required] [MaxLength(100)] public required string State { get; set; }
 
-    [MaxLength(15)] public required string PostalCode { get; set; }
+    [Required] [MaxLength(15)] public required string PostalCode { get; set; }
 }

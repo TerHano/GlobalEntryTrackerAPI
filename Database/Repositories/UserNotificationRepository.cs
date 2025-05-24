@@ -6,11 +6,12 @@ using Microsoft.Extensions.Logging;
 namespace Database.Repositories;
 
 public class UserNotificationRepository(
-    GlobalEntryTrackerDbContext context,
+    IDbContextFactory<GlobalEntryTrackerDbContext> contextFactory,
     ILogger<UserNotificationRepository> logger)
 {
     public async Task<UserNotificationEntity> GetUserWithNotificationSettings(int userId)
     {
+        await using var context = await contextFactory.CreateDbContextAsync();
         var userNotification = await context.UserNotifications
             .Include(x => x.User)
             .Include(x => x.DiscordNotificationSettings)
@@ -25,9 +26,9 @@ public class UserNotificationRepository(
         return userNotification;
     }
 
-    //Create a new user notification
     public async Task<int> CreateUserNotification(int userId)
     {
+        await using var context = await contextFactory.CreateDbContextAsync();
         var newUserNotification = await context.UserNotifications.AddAsync(
             new UserNotificationEntity
             {
@@ -37,10 +38,10 @@ public class UserNotificationRepository(
         return newUserNotification.Entity.Id;
     }
 
-    //Update a user notification
     public async Task<int> UpdateUserDiscordNotificationSettings(int userId,
         DiscordNotificationSettingsEntity discordNotificationSettingsEntity)
     {
+        await using var context = await contextFactory.CreateDbContextAsync();
         var userNotification = await context.UserNotifications
             .FirstOrDefaultAsync(x => x.UserId == userId);
         if (userNotification is null)
@@ -55,7 +56,6 @@ public class UserNotificationRepository(
 
         discordNotificationSettingsEntity.UserNotificationId = userNotification.Id;
         userNotification.DiscordNotificationSettings = discordNotificationSettingsEntity;
-        //context.UserNotifications.Update(entity);
         await context.SaveChangesAsync();
         return userNotification.Id;
     }
@@ -63,6 +63,7 @@ public class UserNotificationRepository(
     public async Task<int> UpdateUserEmailNotificationSettings(int userId,
         EmailNotificationSettingsEntity emailNotificationSettingsEntity)
     {
+        await using var context = await contextFactory.CreateDbContextAsync();
         var userNotification = await context.UserNotifications
             .FirstOrDefaultAsync(x => x.UserId == userId);
         if (userNotification is null)
@@ -77,7 +78,6 @@ public class UserNotificationRepository(
 
         emailNotificationSettingsEntity.UserNotificationId = userNotification.Id;
         userNotification.EmailNotificationSettings = emailNotificationSettingsEntity;
-
         await context.SaveChangesAsync();
         return emailNotificationSettingsEntity.Id;
     }

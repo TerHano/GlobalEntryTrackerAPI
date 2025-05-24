@@ -5,11 +5,12 @@ using Microsoft.Extensions.Logging;
 namespace Database.Repositories;
 
 public class UserCustomerRepository(
-    GlobalEntryTrackerDbContext context,
+    IDbContextFactory<GlobalEntryTrackerDbContext> contextFactory,
     ILogger<UserCustomerRepository> logger)
 {
     public async Task<UserCustomerEntity?> GetCustomerDetailsForUser(int userId)
     {
+        await using var context = await contextFactory.CreateDbContextAsync();
         var userCustomer = await context.UserCustomers.FirstOrDefaultAsync(x => x.UserId == userId);
         return userCustomer;
     }
@@ -18,6 +19,7 @@ public class UserCustomerRepository(
     {
         try
         {
+            await using var context = await contextFactory.CreateDbContextAsync();
             var existingUserCustomer = await context.UserCustomers
                 .FirstOrDefaultAsync(x => x.UserId == userCustomer.UserId);
             if (existingUserCustomer != null)

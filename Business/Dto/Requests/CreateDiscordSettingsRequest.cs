@@ -1,7 +1,10 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Business.Dto.Requests;
 
 public class CreateDiscordSettingsRequest
 {
-    public bool Enabled { get; set; }
-    public string WebhookUrl { get; set; }
+    [Required] public required bool Enabled { get; set; }
+
+    [Required] public string WebhookUrl { get; set; }
 }

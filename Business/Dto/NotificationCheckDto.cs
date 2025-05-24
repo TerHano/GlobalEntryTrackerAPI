@@ -1,6 +1,8 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Business.Dto;
 
 public class NotificationCheckDto
 {
-    public bool IsAnyNotificationsEnabled { get; set; }
+    [Required] public bool IsAnyNotificationsEnabled { get; set; }
 }

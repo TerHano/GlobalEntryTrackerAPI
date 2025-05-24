@@ -1,9 +1,14 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Business.Dto.Requests;
 
 public class CreateTrackerForUserRequest
 {
-    public int LocationId { get; set; }
-    public bool Enabled { get; set; }
-    public int NotificationTypeId { get; set; }
-    public DateOnly CutOffDate { get; set; }
+    [Required] public int LocationId { get; set; }
+
+    [Required] public bool Enabled { get; set; }
+
+    [Required] public int NotificationTypeId { get; set; }
+
+    [Required] public DateOnly CutOffDate { get; set; }
 }

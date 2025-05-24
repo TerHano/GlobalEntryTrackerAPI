@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace GlobalEntryTrackerAPI.Models;
 
 public class ApiResponse<T>
@@ -17,7 +19,9 @@ public class ApiResponse<T>
     }
 
 
-    public bool Success { get; set; }
-    public List<Error> Errors { get; set; }
-    public T? Data { get; set; }
+    [Required] public bool Success { get; set; }
+
+    [Required] public List<Error> Errors { get; set; }
+
+    [Required] public T Data { get; set; }
 }

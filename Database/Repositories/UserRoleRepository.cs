@@ -6,13 +6,14 @@ using Microsoft.Extensions.Logging;
 namespace Database.Repositories;
 
 public class UserRoleRepository(
-    GlobalEntryTrackerDbContext context,
+    IDbContextFactory<GlobalEntryTrackerDbContext> contextFactory,
     ILogger<UserRoleRepository> logger)
 {
     public async Task CreateUserRole(UserRoleEntity userRole)
     {
         try
         {
+            await using var context = await contextFactory.CreateDbContextAsync();
             await context.UserRoles.AddAsync(userRole);
             await context.SaveChangesAsync();
         }
@@ -25,6 +26,7 @@ public class UserRoleRepository(
 
     public async Task<List<UserRoleEntity>> GetUserRolesByUserId(int userId)
     {
+        await using var context = await contextFactory.CreateDbContextAsync();
         var userRole = await context.UserRoles
             .Include(x => x.User)
             .Include(x => x.Role)
@@ -37,6 +39,7 @@ public class UserRoleRepository(
     {
         try
         {
+            await using var context = await contextFactory.CreateDbContextAsync();
             var existingUserRole = await context.UserRoles
                 .Where(x => x.UserId == userId).FirstOrDefaultAsync();
             if (existingUserRole == null)
@@ -64,27 +67,31 @@ public class UserRoleRepository(
         catch (Exception ex)
         {
             logger?.LogError(ex.Message);
+            throw new Exception("Failed to add role for user", ex);
         }
     }
 
-    //Remove role for user
     public async Task RemoveRoleForUser(int userId, Role role)
     {
         try
         {
+            await using var context = await contextFactory.CreateDbContextAsync();
             var existingUserRole = await context.UserRoles
                 .Where(x => x.UserId == userId).Include(userRoleEntity => userRoleEntity.Role)
-                .ToListAsync();
+                .FirstOrDefaultAsync(x => x.Role.Id == (int)role);
             if (existingUserRole == null) throw new NullReferenceException("User roles not found");
-            var userRoleToRemove = existingUserRole.FirstOrDefault(x => x.Role.Id == (int)role);
-            if (userRoleToRemove == null) throw new NullReferenceException("User role not found");
-            context.UserRoles.Remove(userRoleToRemove);
+            context.UserRoles.Remove(existingUserRole);
             await context.SaveChangesAsync();
         }
         catch (DbUpdateException ex)
         {
             logger?.LogError(ex.Message);
             throw new DbUpdateException("Failed to remove role for user", ex);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex.Message);
+            throw new Exception("Failed to add role for user", ex);
         }
     }
 }

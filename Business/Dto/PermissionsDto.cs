@@ -1,6 +1,8 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Business.Dto;
 
 public class PermissionsDto
 {
-    public bool CanCreateTracker { get; set; }
+    [Required] public bool CanCreateTracker { get; set; }
 }

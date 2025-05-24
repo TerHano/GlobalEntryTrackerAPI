@@ -1,6 +1,8 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Business.Dto.Requests;
 
 public class ManageSubscriptionSessionRequest
 {
-    public string ReturnUrl { get; set; } = string.Empty;
+    [Required] public string ReturnUrl { get; set; } = string.Empty;
 }
