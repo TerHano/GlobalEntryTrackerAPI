@@ -1,0 +1,55 @@
+name: Build & Deploy Docker Image CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  BUILD_PLATFORM: linux/amd64
+  BUILD_CONFIGURATION: Release
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build --build-arg BUILD_PLATFORM=$BUILD_PLATFORM --build-arg BUILD_CONFIGURATION=$BUILD_CONFIGURATION . -f WerewolfParty-Server/Dockerfile --tag ${{vars.IMAGE_NAME}}
+      - name: Log in to registry
+        run: | 
+          docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+
+          
+      - name: Push image
+        run: |
+          IMAGE_ID=ghcr.io/${{ github.repository_owner }}/globalentrytracker-api
+          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+
+          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+
+          [ "$VERSION" == "main" ] && VERSION=latest
+          echo IMAGE_ID=$IMAGE_ID
+          echo VERSION=$VERSION
+          docker tag globalentrytracker-api $IMAGE_ID:$VERSION
+          docker push $IMAGE_ID:$VERSION
+      - name: Updates server docker service
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ${{ secrets.ORACLE_USERNAME }}
+          key: ${{ secrets.ORACLE_KEY }}
+          port: ${{ secrets.ORACLE_PORT }}
+          script: |
+            docker pull ghcr.io/terhano/globalentrytracker-api:latest
+            cd /home/ubuntu/docker_projects/global-entry-tracker-api
+            docker compose up -d
