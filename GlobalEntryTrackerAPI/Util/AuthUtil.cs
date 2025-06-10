@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Business.Dto;
 using Database;
+using GlobalEntryTrackerAPI.Enum;
+using GlobalEntryTrackerAPI.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 
@@ -34,7 +36,7 @@ public static class AuthUtil
 
         var claims = new List<Claim>
         {
-            new("InternalId", user.Id.ToString()),
+            new(CustomClaimTypes.InternalId, user.Id.ToString()),
             new(ClaimTypes.Role, user.UserRole.Role.Name)
         };
         var identity = new ClaimsIdentity(claims);
@@ -45,22 +47,24 @@ public static class AuthUtil
         HttpResponse response,
         AuthToken token)
     {
-        response.Cookies.Append("access_token", token.AccessToken,
+        response.Cookies.Append(AuthCookie.AccessTokenName, token.AccessToken,
             new CookieOptions
             {
                 HttpOnly = true,
-                Secure = false,
+                Secure = true,
                 SameSite = SameSiteMode.Lax,
                 Path = "/",
+                Domain = token.Domain,
                 Expires = DateTimeOffset.UtcNow.AddMinutes(90)
             });
-        response.Cookies.Append("refresh_token", token.RefreshToken,
+        response.Cookies.Append(AuthCookie.RefreshTokenName, token.RefreshToken,
             new CookieOptions
             {
                 HttpOnly = true,
-                Secure = false,
+                Secure = true,
                 SameSite = SameSiteMode.Lax,
                 Path = "/",
+                Domain = token.Domain,
                 Expires = DateTimeOffset.UtcNow.AddDays(7)
             });
     }
@@ -68,7 +72,7 @@ public static class AuthUtil
     public static void ClearResponseAuthCookies(
         HttpResponse response)
     {
-        response.Cookies.Delete("access_token");
-        response.Cookies.Delete("refresh_token");
+        response.Cookies.Delete(AuthCookie.AccessTokenName);
+        response.Cookies.Delete(AuthCookie.RefreshTokenName);
     }
 }

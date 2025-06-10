@@ -34,11 +34,7 @@ public class AuthBusiness(
             await supabaseClient.Auth.SignInWithPassword(request.Email, request.Password);
         if (response?.AccessToken == null || response?.RefreshToken == null)
             throw new Exception("User could not be signed in");
-        return new AuthToken
-        {
-            AccessToken = response.AccessToken,
-            RefreshToken = response.RefreshToken
-        };
+        return CreateAuthToken(response.AccessToken, response.RefreshToken);
     }
 
     public async Task<AuthToken> RefreshToken(string refreshToken)
@@ -71,11 +67,7 @@ public class AuthBusiness(
         if (session == null) throw new Exception("User could not be verified");
         if (session.AccessToken == null || session.RefreshToken == null)
             throw new Exception("User could not be verified");
-        return new AuthToken
-        {
-            AccessToken = session.AccessToken,
-            RefreshToken = session.RefreshToken
-        };
+        return CreateAuthToken(session.AccessToken, session.RefreshToken);
     }
 
     public async Task<UserDto> ResetPasswordForUser(int userId, ResetPasswordRequest request)
@@ -226,11 +218,7 @@ public class AuthBusiness(
         var refreshTokenResp = supabaseRefreshBody.RefreshToken;
         if (string.IsNullOrEmpty(accessToken) || string.IsNullOrEmpty(refreshTokenResp))
             throw new Exception("Failed to refresh token through Supabase");
-        return new AuthToken
-        {
-            AccessToken = accessToken,
-            RefreshToken = refreshTokenResp
-        };
+        return CreateAuthToken(accessToken, refreshTokenResp);
         // Use accessToken and refreshTokenResp as needed
     }
 
@@ -246,5 +234,17 @@ public class AuthBusiness(
                 "Supabase service key is not set in environment variables or configuration");
         var supabaseClient = await GetSupabaseClient();
         return supabaseClient.AdminAuth(supabaseServiceKey);
+    }
+
+    private AuthToken CreateAuthToken(string accessToken, string refreshToken)
+    {
+        var domain = configuration["Auth:Cookie_Domain"];
+        return new AuthToken
+        {
+            AccessToken = accessToken,
+            RefreshToken = refreshToken,
+            Domain = domain ??
+                     throw new ApplicationException("Cookie domain is not set in configuration")
+        };
     }
 }

@@ -8,6 +8,7 @@ using Database;
 using Database.Repositories;
 using GlobalEntryTrackerAPI.Endpoints;
 using GlobalEntryTrackerAPI.Endpoints.Notifications;
+using GlobalEntryTrackerAPI.Enum;
 using GlobalEntryTrackerAPI.Middleware;
 using GlobalEntryTrackerAPI.Util;
 using GlobalEntryTrackerAPI.Webhooks;
@@ -233,8 +234,8 @@ var app = builder.Build();
 // Place this before app.UseAuthentication();
 app.Use(async (context, next) =>
 {
-    var token = context.Request.Cookies["access_token"];
-    if (!string.IsNullOrEmpty(token)) context.Request.Headers["Authorization"] = $"Bearer {token}";
+    var token = context.Request.Cookies[AuthCookie.AccessTokenName];
+    if (!string.IsNullOrEmpty(token)) context.Request.Headers.Authorization = $"Bearer {token}";
     await next();
 });
 
