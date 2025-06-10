@@ -109,11 +109,15 @@ public static class AuthEndpoint
             .Produces<ApiResponse<string>>()
             .Produces<ApiResponse<object>>(StatusCodes.Status400BadRequest);
 
-        app.MapPost("/api/auth/v1/sign-out", (HttpResponse response) =>
-            {
-                AuthUtil.ClearResponseAuthCookies(response);
-                return Results.Ok();
-            })
+        app.MapPost("/api/auth/v1/sign-out",
+                (HttpResponse response, IConfiguration configuration) =>
+                {
+                    var domain = configuration["Auth:Cookie_Domain"];
+                    if (string.IsNullOrEmpty(domain))
+                        return Results.BadRequest("Domain for cookies is not configured.");
+                    AuthUtil.ClearResponseAuthCookies(response, domain);
+                    return Results.Ok();
+                })
             .Produces<ApiResponse<object>>()
             .Produces<ApiResponse<object>>(StatusCodes.Status400BadRequest);
 

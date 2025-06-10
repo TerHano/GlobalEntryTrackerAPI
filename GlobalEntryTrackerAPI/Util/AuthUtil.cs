@@ -70,9 +70,17 @@ public static class AuthUtil
     }
 
     public static void ClearResponseAuthCookies(
-        HttpResponse response)
+        HttpResponse response, string domain)
     {
-        response.Cookies.Delete(AuthCookie.AccessTokenName);
-        response.Cookies.Delete(AuthCookie.RefreshTokenName);
+        var cookieOptions = new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Lax,
+            Path = "/",
+            Domain = domain
+        };
+        response.Cookies.Delete(AuthCookie.AccessTokenName, cookieOptions);
+        response.Cookies.Delete(AuthCookie.RefreshTokenName, cookieOptions);
     }
 }

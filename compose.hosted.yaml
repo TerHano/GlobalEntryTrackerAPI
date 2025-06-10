@@ -20,6 +20,7 @@ services:
       - ASPNETCORE_URLS=http://+:80
       - Logging__Loglevel__Default=${LOGGING__LOGLEVEL__DEFAULT}
       - Logging__Loglevel__Microsoft__Aspnetcore=${LOGGING__LOGLEVEL__MICROSOFT_ASPNETCORE}
+      - Auth__Cookie_Domain=${AUTH__COOKIE_DOMAIN}
       - Auth__Issuer=${AUTH__ISSUER}
       - Auth__Audience=${AUTH__AUDIENCE}
       - Auth__Signing_Key=${AUTH__SIGNING_KEY}
