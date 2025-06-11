@@ -1,4 +1,5 @@
 using Database.Repositories;
+using Microsoft.Extensions.Configuration;
 using Quartz;
 using Service.Jobs;
 
@@ -6,11 +7,18 @@ namespace Service;
 
 public class JobService(
     ISchedulerFactory schedulerFactory,
-    AppointmentLocationRepository appointmentLocationRepository)
+    AppointmentLocationRepository appointmentLocationRepository,
+    IConfiguration configuration)
+
 {
     public async Task StartTrackingAppointmentLocation(int locationId)
     {
         var scheduler = await schedulerFactory.GetScheduler();
+        var jobIntervalStr = configuration["Jobs:Location_Fetch_Interval_In_Minutes"];
+        if (string.IsNullOrEmpty(jobIntervalStr) ||
+            !int.TryParse(jobIntervalStr,
+                out var jobInterval)) jobInterval = 10; // Default to 10 minutes if not configured
+
         var alreadyRunning = await scheduler.CheckExists(GetJobKey(locationId));
         if (!alreadyRunning)
         {
@@ -27,7 +35,7 @@ public class JobService(
                 .WithIdentity(GetTriggerKey(locationId))
                 .StartNow()
                 .WithSimpleSchedule(x => x
-                    .WithIntervalInMinutes(5)
+                    .WithIntervalInMinutes(jobInterval)
                     .RepeatForever())
                 .Build();
 
@@ -43,6 +51,6 @@ public class JobService(
 
     private static TriggerKey GetTriggerKey(int locationId)
     {
-        return new TriggerKey("5min", $"Trigger-{locationId}");
+        return new TriggerKey("EveryConfiguredMin", $"Trigger-{locationId}");
     }
 }
