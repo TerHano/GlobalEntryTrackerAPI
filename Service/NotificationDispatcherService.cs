@@ -20,7 +20,7 @@ public class NotificationDispatcherService(
             await appointmentLocationRepository.GetAppointmentLocationByExternalId(externalId);
         if (locationInformation == null) throw new ApplicationException("No location found");
         var trackersForLocation =
-            trackedLocationForUserRepository.GetTrackersByLocationIdDueForNotification(
+            await trackedLocationForUserRepository.GetTrackersByLocationIdDueForNotification(
                 locationInformation.Id);
 
         foreach (var trackedLocationForUser in trackersForLocation)

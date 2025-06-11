@@ -126,6 +126,24 @@ public class SubscriptionBusiness(
             CardLast4Digits = null,
             CardBrand = null
         };
+
+        var friendsAndFamilyPlan = new UserSubscriptionDto
+        {
+            ActiveBilledSubscription = true,
+            PlanName = "Friends & Family",
+            PlanPrice = 0,
+            Currency = "USD",
+            PlanInterval = "month",
+            NextPaymentDate =
+                null,
+            IsEnding = false,
+            CardLast4Digits = null,
+            CardBrand = null
+        };
+
+        var userRole = await userRoleRepository.GetUserRoleByUserId(userId);
+        if (userRole.Role.Code == Role.FriendsFamily.GetCode()) return friendsAndFamilyPlan;
+
         var userCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
         if (userCustomer == null)
             return freePlanInformation;

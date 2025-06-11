@@ -2,9 +2,10 @@ namespace Database.Enums;
 
 public enum Role
 {
-    Free = 0,
-    Subscriber = 1,
-    Admin = 2
+    Free,
+    Subscriber,
+    Admin,
+    FriendsFamily
 }
 
 public static class RoleExtensions
@@ -16,6 +17,7 @@ public static class RoleExtensions
             Role.Free => "free",
             Role.Subscriber => "subscriber",
             Role.Admin => "admin",
+            Role.FriendsFamily => "friends_family",
             _ => throw new ArgumentOutOfRangeException()
         };
     }

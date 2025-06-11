@@ -39,17 +39,18 @@ public class TrackedLocationForUserRepository(
     /// <summary>
     ///     Retrieves trackers for a specific location ID that are due for notification.
     /// </summary>
-    public List<TrackedLocationForUserEntity> GetTrackersByLocationIdDueForNotification(
+    public async Task<List<TrackedLocationForUserEntity>> GetTrackersByLocationIdDueForNotification(
         int locationId)
     {
-        using var context = contextFactory.CreateDbContext();
+        using var context = await contextFactory.CreateDbContextAsync();
         var now = DateTime.UtcNow;
-        return context.UserTrackedLocations.Include(x => x.NotificationType)
+        return await context.UserTrackedLocations.Include(x => x.NotificationType)
             .Include(x => x.Location)
             .Include(x => x.User)
             .ThenInclude(x => x.UserRole)
             .ThenInclude(x => x.Role)
-            .Where(x => x.LocationId == locationId && x.User.NextNotificationAt < now).ToList();
+            .Where(x => x.Enabled && x.LocationId == locationId && x.User.NextNotificationAt < now)
+            .ToListAsync();
     }
 
     /// <summary>

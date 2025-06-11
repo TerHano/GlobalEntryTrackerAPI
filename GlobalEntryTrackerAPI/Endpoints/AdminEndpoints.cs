@@ -2,6 +2,7 @@ using Business;
 using Business.Dto.Admin;
 using Business.Dto.Requests;
 using FluentValidation;
+using GlobalEntryTrackerAPI.Extensions;
 using GlobalEntryTrackerAPI.Models;
 using GlobalEntryTrackerAPI.Validators;
 
@@ -13,9 +14,10 @@ public static class AdminEndpoints
     {
         // Get: All users
         app.MapGet("/api/v1/admin/users",
-                async (UserBusiness userBusiness) =>
+                async (UserBusiness userBusiness, HttpContext httpContext) =>
                 {
-                    var users = await userBusiness.GetAllUsersForAdmin();
+                    var userId = httpContext.User.GetUserId();
+                    var users = await userBusiness.GetAllUsersForAdmin(userId);
                     return Results.Ok(users);
                 })
             .RequireAuthorization("Admin")

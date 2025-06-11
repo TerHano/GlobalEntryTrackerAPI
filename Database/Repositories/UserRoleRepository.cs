@@ -24,13 +24,13 @@ public class UserRoleRepository(
         }
     }
 
-    public async Task<List<UserRoleEntity>> GetUserRolesByUserId(int userId)
+    public async Task<UserRoleEntity> GetUserRoleByUserId(int userId)
     {
         await using var context = await contextFactory.CreateDbContextAsync();
         var userRole = await context.UserRoles
             .Include(x => x.User)
             .Include(x => x.Role)
-            .Where(x => x.UserId == userId).ToListAsync();
+            .Where(x => x.UserId == userId).FirstOrDefaultAsync();
         if (userRole is null) throw new NullReferenceException("User role does not exist");
         return userRole;
     }

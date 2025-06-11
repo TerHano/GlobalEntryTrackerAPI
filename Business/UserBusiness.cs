@@ -20,19 +20,11 @@ public class UserBusiness(
     ISchedulerFactory schedulerFactory,
     IMapper mapper)
 {
-    /// <summary>
-    ///     Gets all users
-    /// </summary>
-    public async Task<List<UserDto>> GetAllUsers()
-    {
-        var users = await userRepository.GetAllUsers();
-        return mapper.Map<List<UserDto>>(users);
-    }
-
     //get all users for admin
-    public async Task<List<UserDtoForAdmin>> GetAllUsersForAdmin()
+    public async Task<List<UserDtoForAdmin>> GetAllUsersForAdmin(int userId,
+        bool includeSelf = false)
     {
-        var users = await userRepository.GetAllUsersForAdmin();
+        var users = await userRepository.GetAllUsersForAdmin(userId, includeSelf);
         return mapper.Map<List<UserDtoForAdmin>>(users);
     }
 

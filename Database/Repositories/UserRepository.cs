@@ -103,9 +103,14 @@ public class UserRepository(
     }
 
     //get users for admin
-    public async Task<List<UserEntity>> GetAllUsersForAdmin()
+    public async Task<List<UserEntity>> GetAllUsersForAdmin(int userId, bool includeSelf = false)
     {
         await using var context = await contextFactory.CreateDbContextAsync();
+        if (!includeSelf)
+            return await context.Users.Include(x => x.UserRole).ThenInclude(x => x.Role)
+                .Include(x => x.UserCustomer)
+                .Where(x => x.Id != userId)
+                .OrderByDescending(x => x.CreatedAt).ToListAsync();
         return await context.Users.Include(x => x.UserRole).ThenInclude(x => x.Role)
             .Include(x => x.UserCustomer)
             .OrderByDescending(x => x.CreatedAt).ToListAsync();
