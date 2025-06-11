@@ -1,6 +1,7 @@
 using Business;
 using Business.Dto;
 using Business.Dto.Requests;
+using GlobalEntryTrackerAPI.Enum;
 using GlobalEntryTrackerAPI.Extensions;
 using GlobalEntryTrackerAPI.Models;
 using GlobalEntryTrackerAPI.Util;
@@ -94,7 +95,7 @@ public static class AuthEndpoint
                 async (AuthBusiness authBusiness,
                     HttpResponse response, HttpRequest request) =>
                 {
-                    var refreshToken = request.Cookies["refresh_token"];
+                    var refreshToken = request.Cookies[AuthCookie.RefreshTokenName];
                     if (string.IsNullOrEmpty(refreshToken))
                         return Results.BadRequest();
                     var token = await authBusiness.RefreshToken(refreshToken);
