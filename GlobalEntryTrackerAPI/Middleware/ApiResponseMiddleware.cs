@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text.Json;
+using Business.Exceptions;
 using FluentValidation;
-using GlobalEntryTrackerAPI.Exceptions;
 using GlobalEntryTrackerAPI.Models;
 
 namespace GlobalEntryTrackerAPI.Middleware;

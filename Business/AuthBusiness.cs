@@ -3,12 +3,14 @@ using System.Text.Json;
 using AutoMapper;
 using Business.Dto;
 using Business.Dto.Requests;
+using Business.Exceptions;
 using Database.Entities;
 using Database.Entities.NotificationSettings;
 using Database.Enums;
 using Database.Repositories;
 using Microsoft.Extensions.Configuration;
 using Supabase.Gotrue;
+using Supabase.Gotrue.Exceptions;
 using Supabase.Gotrue.Interfaces;
 using Client = Supabase.Client;
 
@@ -30,10 +32,19 @@ public class AuthBusiness(
     public async Task<AuthToken> SignIn(SignInRequest request)
     {
         var supabaseClient = await GetSupabaseClient();
-        var response =
-            await supabaseClient.Auth.SignInWithPassword(request.Email, request.Password);
+        Session? response;
+        try
+        {
+            response =
+                await supabaseClient.Auth.SignInWithPassword(request.Email, request.Password);
+        }
+        catch (GotrueException)
+        {
+            throw new IncorrectLoginInformationException("Incorrect email or password");
+        }
+
         if (response?.AccessToken == null || response?.RefreshToken == null)
-            throw new Exception("User could not be signed in");
+            throw new IncorrectLoginInformationException("Incorrect email or password");
         return CreateAuthToken(response.AccessToken, response.RefreshToken);
     }
 

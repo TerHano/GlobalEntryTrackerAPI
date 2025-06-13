@@ -1,4 +1,4 @@
-namespace GlobalEntryTrackerAPI.Exceptions;
+namespace Business.Exceptions;
 
 public class TrackerForLocationAndTypeExistsException : BaseApplicationException
 {

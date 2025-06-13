@@ -1,9 +1,9 @@
 using AutoMapper;
 using Business.Dto;
 using Business.Dto.Requests;
+using Business.Exceptions;
 using Database.Entities;
 using Database.Repositories;
-using GlobalEntryTrackerAPI.Exceptions;
 using Microsoft.Extensions.Logging;
 using Service;
 
