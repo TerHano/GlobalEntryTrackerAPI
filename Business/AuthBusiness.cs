@@ -280,7 +280,7 @@ public class AuthBusiness(
         var supabaseKey = configuration["Auth:Supabase_Anon_Key"];
 
         var requestMessage = new HttpRequestMessage(HttpMethod.Post,
-            $"{supabaseUrl}/resend")
+            $"{supabaseUrl}/auth/v1/resend")
         {
             Content = content
         };
