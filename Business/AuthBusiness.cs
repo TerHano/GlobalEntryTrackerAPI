@@ -38,9 +38,14 @@ public class AuthBusiness(
             response =
                 await supabaseClient.Auth.SignInWithPassword(request.Email, request.Password);
         }
-        catch (GotrueException)
+        catch (GotrueException e)
         {
-            throw new IncorrectLoginInformationException("Incorrect email or password");
+            if (e.Reason is FailureHint.Reason.UserBadLogin or FailureHint.Reason.UserBadPassword
+                or FailureHint.Reason.UserBadMultiple)
+                throw new IncorrectLoginInformationException("Incorrect email or password");
+            if (e.Reason is FailureHint.Reason.UserEmailNotConfirmed)
+                throw new EmailNotConfirmedException("User email is not confirmed");
+            throw new Exception("An error occurred while signing in", e);
         }
 
         if (response?.AccessToken == null || response?.RefreshToken == null)
@@ -79,6 +84,12 @@ public class AuthBusiness(
         if (session.AccessToken == null || session.RefreshToken == null)
             throw new Exception("User could not be verified");
         return CreateAuthToken(session.AccessToken, session.RefreshToken);
+    }
+
+    //Resend verification email
+    public async Task ResendVerificationEmail(ResendEmailVerificationRequest request)
+    {
+        await ResendSignUpVerificationEmail(request.Email);
     }
 
     public async Task<UserDto> ResetPasswordForUser(int userId, ResetPasswordRequest request)
@@ -257,5 +268,31 @@ public class AuthBusiness(
             Domain = domain ??
                      throw new ApplicationException("Cookie domain is not set in configuration")
         };
+    }
+
+    private async Task ResendSignUpVerificationEmail(string email)
+    {
+        var payload = new { email, type = "signup" };
+        var json = JsonSerializer.Serialize(payload);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        var supabaseUrl = configuration["Auth:Supabase_Url"];
+        var supabaseKey = configuration["Auth:Supabase_Anon_Key"];
+
+        var requestMessage = new HttpRequestMessage(HttpMethod.Post,
+            $"{supabaseUrl}/resend")
+        {
+            Content = content
+        };
+        requestMessage.Headers.Add("apiKey", supabaseKey);
+        var response = await httpClient.SendAsync(requestMessage);
+        if (!response.IsSuccessStatusCode)
+            throw new ResendVerifyEmailException(
+                "Failed to resend verification email through Supabase");
+        var responseBody = await response.Content.ReadAsStringAsync();
+        var supabaseRefreshBody =
+            JsonSerializer.Deserialize<SupabaseResendResponse>(responseBody);
+        if (supabaseRefreshBody == null)
+            throw new ResendVerifyEmailException("Failed to deserialize Supabase resend response");
     }
 }

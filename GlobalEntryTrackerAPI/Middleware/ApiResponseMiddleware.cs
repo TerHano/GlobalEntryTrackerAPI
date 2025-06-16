@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Business.Enum;
 using Business.Exceptions;
 using FluentValidation;
 using GlobalEntryTrackerAPI.Models;
@@ -79,7 +80,7 @@ public class ApiResponseMiddleware(RequestDelegate next, ILogger<ApiResponseMidd
                         {
                             return new Error
                             {
-                                Code = 0,
+                                Code = ExceptionCode.GenericError,
                                 Message = e
                             };
                         }).ToList()
@@ -100,7 +101,7 @@ public class ApiResponseMiddleware(RequestDelegate next, ILogger<ApiResponseMidd
                             }
                         ]
                     };
-                    context.Response.StatusCode = (int)HttpStatusCode.Conflict;
+                    context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
                 }
                 else
                 {
@@ -111,7 +112,7 @@ public class ApiResponseMiddleware(RequestDelegate next, ILogger<ApiResponseMidd
                         [
                             new Error
                             {
-                                Code = 0,
+                                Code = ExceptionCode.GenericError,
                                 Message = "An unexpected error occurred."
                             }
                         ]

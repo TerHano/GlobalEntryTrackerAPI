@@ -140,6 +140,22 @@ public static class AuthEndpoint
             .Produces<ApiResponse<object>>()
             .Produces<ApiResponse<object>>(StatusCodes.Status400BadRequest);
 
+        //POST resend-email-verification
+        app.MapPost("/api/auth/v1/resend-email-verification",
+                async (ResendEmailVerificationRequest request, AuthBusiness authBusiness) =>
+                {
+                    await authBusiness.ResendVerificationEmail(request);
+                    return Results.Ok();
+                })
+            .WithTags("Authentication")
+            .WithName("ResendEmailVerification")
+            .WithSummary("Resend email verification")
+            .WithDescription(
+                "Resends the email verification link to the user with the provided email address.")
+            .Accepts<ResendEmailVerificationRequest>("application/json")
+            .Produces<ApiResponse<object>>()
+            .Produces<ApiResponse<object>>(StatusCodes.Status400BadRequest);
+
         app.MapPost("/api/auth/v1/verify-email-reset",
                 async (VerifyOtpRequest request, AuthBusiness authBusiness,
                     HttpResponse response) =>

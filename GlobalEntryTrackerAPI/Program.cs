@@ -136,6 +136,7 @@ builder.Services.AddSwaggerGen(options =>
         Version = "v1",
         Description = "API for Global Entry Tracker"
     });
+    options.UseInlineDefinitionsForEnums();
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",

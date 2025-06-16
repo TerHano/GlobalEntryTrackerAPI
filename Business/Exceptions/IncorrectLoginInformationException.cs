@@ -1,4 +1,6 @@
+using Business.Enum;
+
 namespace Business.Exceptions;
 
 public class IncorrectLoginInformationException(string message)
-    : BaseApplicationException(message, 1002);
+    : BaseApplicationException(message, ExceptionCode.IncorrectLoginInformation);
