@@ -6,6 +6,7 @@ namespace Business.Enum;
 public enum ExceptionCode
 {
     GenericError = 0,
+    NotAvailable = 100,
     IncorrectLoginInformation = 1002,
     TrackerForLocationAndTypeExists = 1001,
     ResendVerifyEmail = 1003,

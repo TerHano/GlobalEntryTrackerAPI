@@ -15,7 +15,7 @@ public class EmailNotificationSettingsBusiness(
     UserNotificationRepository userNotificationRepository,
     NotificationManagerService notificationManager,
     UserRepository userRepository,
-    IMapper mapper)
+    IMapper mapper) : IEmailNotificationSettingsBusiness
 {
     /// <summary>
     ///     Gets the email notification settings for a user.

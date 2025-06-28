@@ -81,7 +81,8 @@ builder.Services.AddScoped<UserAppointmentTrackerBusiness>();
 builder.Services.AddScoped<NotificationBusiness>();
 builder.Services.AddScoped<UserBusiness>();
 builder.Services.AddScoped<DiscordNotificationSettingsBusiness>();
-builder.Services.AddScoped<EmailNotificationSettingsBusiness>();
+builder.Services
+    .AddScoped<IEmailNotificationSettingsBusiness, NotAvailableEmailNotificationBusiness>();
 builder.Services.AddScoped<NotificationManagerService>();
 builder.Services.AddScoped<NotificationDispatcherService>();
 builder.Services.AddScoped<SubscriptionBusiness>();

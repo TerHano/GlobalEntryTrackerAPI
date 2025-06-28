@@ -12,7 +12,7 @@ public static class EmailNotificationEndpoints
     {
         app.MapGet("/api/v1/notification-settings/email",
                 async (HttpContext httpContext,
-                    EmailNotificationSettingsBusiness emailNotificationSettingsBusiness) =>
+                    IEmailNotificationSettingsBusiness emailNotificationSettingsBusiness) =>
                 {
                     var userId = httpContext.User.GetUserId();
                     var emailSettings = await emailNotificationSettingsBusiness
@@ -31,7 +31,7 @@ public static class EmailNotificationEndpoints
         app.MapPost("/api/v1/notification-settings/email",
                 async (CreateEmailNotificationSettingsRequest newSettings,
                     HttpContext httpContext,
-                    EmailNotificationSettingsBusiness emailNotificationSettingsBusiness) =>
+                    IEmailNotificationSettingsBusiness emailNotificationSettingsBusiness) =>
                 {
                     var userId = httpContext.User.GetUserId();
                     var newSettingsId = await emailNotificationSettingsBusiness
@@ -52,7 +52,7 @@ public static class EmailNotificationEndpoints
         app.MapPut("/api/v1/notification-settings/email",
                 async (UpdateEmailNotificationSettingsRequest updatedSettings,
                     HttpContext httpContext,
-                    EmailNotificationSettingsBusiness emailNotificationSettingsBusiness) =>
+                    IEmailNotificationSettingsBusiness emailNotificationSettingsBusiness) =>
                 {
                     var userId = httpContext.User.GetUserId();
                     var newSettingsId = await emailNotificationSettingsBusiness
@@ -72,7 +72,7 @@ public static class EmailNotificationEndpoints
 
         app.MapPost("/api/v1/notification-settings/email/test",
                 async (HttpContext httpContext,
-                    EmailNotificationSettingsBusiness emailNotificationSettingsBusiness) =>
+                    IEmailNotificationSettingsBusiness emailNotificationSettingsBusiness) =>
                 {
                     var userId = httpContext.User.GetUserId();
                     await emailNotificationSettingsBusiness
