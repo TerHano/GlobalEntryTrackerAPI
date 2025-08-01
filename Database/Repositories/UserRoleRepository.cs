@@ -1,21 +1,24 @@
 using Database.Entities;
 using Database.Enums;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Database.Repositories;
 
 public class UserRoleRepository(
-    IDbContextFactory<GlobalEntryTrackerDbContext> contextFactory,
+    UserManager<UserEntity> userManager,
+    RoleManager<RoleEntity> roleManager,
     ILogger<UserRoleRepository> logger)
 {
-    public async Task CreateUserRole(UserRoleEntity userRole)
+    public async Task CreateUserRole(string userId, Role role)
     {
         try
         {
-            await using var context = await contextFactory.CreateDbContextAsync();
-            await context.UserRoles.AddAsync(userRole);
-            await context.SaveChangesAsync();
+            var user = await userManager.FindByIdAsync(userId);
+            if (user == null) throw new NullReferenceException("User not found");
+            if (!await userManager.IsInRoleAsync(user, nameof(role)))
+                await userManager.AddToRoleAsync(user, nameof(role));
         }
         catch (DbUpdateException ex)
         {
@@ -24,40 +27,26 @@ public class UserRoleRepository(
         }
     }
 
-    public async Task<UserRoleEntity> GetUserRoleByUserId(int userId)
+    public async Task<List<RoleEntity>> GetUserRoleByUserId(string userId)
     {
-        await using var context = await contextFactory.CreateDbContextAsync();
-        var userRole = await context.UserRoles
-            .Include(x => x.User)
-            .Include(x => x.Role)
-            .Where(x => x.UserId == userId).FirstOrDefaultAsync();
-        if (userRole is null) throw new NullReferenceException("User role does not exist");
-        return userRole;
+        var user = await userManager.FindByIdAsync(userId);
+        if (user == null) throw new NullReferenceException("User not found");
+        var roles = await userManager.GetRolesAsync(user);
+        //get role entities from the database
+        var roleEntities = await roleManager.Roles
+            .Where(r => roles.Contains(r.Name))
+            .ToListAsync();
+        return roleEntities;
     }
 
-    public async Task AddEditRoleForUser(int userId, Role role)
+    public async Task AddEditRoleForUser(string userId, Role role)
     {
         try
         {
-            await using var context = await contextFactory.CreateDbContextAsync();
-            var existingUserRole = await context.UserRoles
-                .Where(x => x.UserId == userId).FirstOrDefaultAsync();
-            if (existingUserRole == null)
-            {
-                var newUserRole = new UserRoleEntity
-                {
-                    UserId = userId,
-                    RoleId = (int)role
-                };
-                await context.UserRoles.AddAsync(newUserRole);
-            }
-            else
-            {
-                existingUserRole.RoleId = (int)role;
-                context.UserRoles.Update(existingUserRole);
-            }
-
-            await context.SaveChangesAsync();
+            var user = await userManager.FindByIdAsync(userId);
+            if (user == null) throw new NullReferenceException("User not found");
+            if (!await userManager.IsInRoleAsync(user, nameof(role)))
+                await userManager.AddToRoleAsync(user, nameof(role));
         }
         catch (DbUpdateException ex)
         {
@@ -71,17 +60,14 @@ public class UserRoleRepository(
         }
     }
 
-    public async Task RemoveRoleForUser(int userId, Role role)
+    public async Task RemoveRoleForUser(string userId, Role role)
     {
         try
         {
-            await using var context = await contextFactory.CreateDbContextAsync();
-            var existingUserRole = await context.UserRoles
-                .Where(x => x.UserId == userId).Include(userRoleEntity => userRoleEntity.Role)
-                .FirstOrDefaultAsync(x => x.Role.Id == (int)role);
-            if (existingUserRole == null) throw new NullReferenceException("User roles not found");
-            context.UserRoles.Remove(existingUserRole);
-            await context.SaveChangesAsync();
+            var user = await userManager.FindByIdAsync(userId);
+            if (user == null) throw new NullReferenceException("User not found");
+            if (await userManager.IsInRoleAsync(user, nameof(role)))
+                await userManager.RemoveFromRoleAsync(user, nameof(role));
         }
         catch (DbUpdateException ex)
         {

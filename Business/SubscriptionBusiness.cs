@@ -3,6 +3,7 @@ using Business.Dto.Requests;
 using Database.Entities;
 using Database.Enums;
 using Database.Repositories;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Service;
@@ -17,7 +18,8 @@ namespace Business;
 public class SubscriptionBusiness(
     UserCustomerRepository userCustomerRepository,
     UserRoleRepository userRoleRepository,
-    UserRepository userRepository,
+    UserProfileRepository userProfileRepository,
+    RoleManager<RoleEntity> roleManager,
     UserRoleService userRoleService,
     IConfiguration configuration,
     ILogger<SubscriptionBusiness> logger)
@@ -28,7 +30,7 @@ public class SubscriptionBusiness(
     /// <param name="userId">User ID.</param>
     /// <param name="request">Checkout session request.</param>
     /// <returns>Stripe Checkout session URL.</returns>
-    public async Task<string> GetSubscriptionPaymentUrl(int userId,
+    public async Task<string> GetSubscriptionPaymentUrl(string userId,
         CreateCheckoutSessionRequest request)
     {
         if (request.PriceId == null) throw new Exception("Price Id is required");
@@ -51,7 +53,7 @@ public class SubscriptionBusiness(
             {
                 Metadata = new Dictionary<string, string>
                 {
-                    { "userId", userId.ToString() }
+                    { "userId", userId }
                 }
             }
         };
@@ -66,7 +68,7 @@ public class SubscriptionBusiness(
     /// <param name="userId">User ID.</param>
     /// <param name="request">Management session request.</param>
     /// <returns>Stripe Billing Portal session URL.</returns>
-    public async Task<string> GetSubscriptionManagementUrl(int userId,
+    public async Task<string> GetSubscriptionManagementUrl(string userId,
         ManageSubscriptionSessionRequest request)
     {
         var userCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
@@ -87,7 +89,7 @@ public class SubscriptionBusiness(
     /// </summary>
     /// <param name="userId">User ID.</param>
     /// <returns>True if the user has an active subscription; otherwise, false.</returns>
-    public async Task<bool> ValidatePurchaseForUser(int userId)
+    public async Task<bool> ValidatePurchaseForUser(string userId)
     {
         var userCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
         if (userCustomer == null)
@@ -111,7 +113,7 @@ public class SubscriptionBusiness(
     /// </summary>
     /// <param name="userId">User ID.</param>
     /// <returns>User subscription DTO or null.</returns>
-    public async Task<UserSubscriptionDto?> GetSubscriptionInformationForUser(int userId)
+    public async Task<UserSubscriptionDto?> GetSubscriptionInformationForUser(string userId)
     {
         var freePlanInformation = new UserSubscriptionDto
         {
@@ -141,9 +143,9 @@ public class SubscriptionBusiness(
             CardBrand = null
         };
 
-        var userRole = await userRoleRepository.GetUserRoleByUserId(userId);
-        if (userRole.Role.Code == Role.FriendsFamily.GetCode()) return friendsAndFamilyPlan;
-
+        var userRoles = await userRoleRepository.GetUserRoleByUserId(userId);
+        if (userRoles.Any(x => x.Code == Role.FriendsFamily.GetCode()))
+            return friendsAndFamilyPlan;
         var userCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
         if (userCustomer == null)
             return freePlanInformation;
@@ -243,26 +245,27 @@ public class SubscriptionBusiness(
                             "UserId not found in subscription metadata");
                     }
 
-                    var userIdInt = int.Parse(userId);
+
                     var userCustomer = new UserCustomerEntity
                     {
-                        UserId = userIdInt,
+                        UserId = userId,
                         SubscriptionId = subscriptionEvent.Id,
                         CustomerId = subscriptionEvent.CustomerId
                     };
-                    await userRoleRepository.AddEditRoleForUser(userIdInt, Role.Subscriber);
+                    await userRoleRepository.AddEditRoleForUser(userId, Role.Subscriber);
                     await userCustomerRepository.AddEditUserCustomer(userCustomer);
 
                     //Move up users next notification date
-                    var user = await userRepository.GetUserById(userIdInt);
+                    var user = await userProfileRepository.GetUserProfileById(userId);
                     if (user == null)
                     {
                         logger.LogError("User not found");
                         throw new NullReferenceException("User not found");
                     }
 
-                    userRoleService.UpdateNextNotificationTimeForUser(user);
-                    await userRepository.UpdateUser(user);
+                    var roles = roleManager.Roles.ToList();
+                    userRoleService.UpdateNextNotificationTimeForUser(user, roles);
+                    await userProfileRepository.UpdateUserProfile(user);
                     break;
                 }
                 case EventTypes.CustomerSubscriptionDeleted:
@@ -282,7 +285,7 @@ public class SubscriptionBusiness(
                     }
 
                     var userIdInt = int.Parse(userId);
-                    await userRoleRepository.RemoveRoleForUser(userIdInt, Role.Subscriber);
+                    await userRoleRepository.RemoveRoleForUser(userId, Role.Subscriber);
                     break;
                 }
             }
@@ -297,7 +300,7 @@ public class SubscriptionBusiness(
 
     public async Task GrantSubscriptionToUser(GrantSubscriptionRequest request)
     {
-        var user = await userRepository.GetUserById(request.UserId);
+        var user = await userProfileRepository.GetUserProfileById(request.UserId);
         var customerService = new CustomerService();
         var customer = await customerService.CreateAsync(
             new CustomerCreateOptions
@@ -330,7 +333,7 @@ public class SubscriptionBusiness(
                 ],
                 Metadata = new Dictionary<string, string>
                 {
-                    { "userId", request.UserId.ToString() }
+                    { "userId", request.UserId }
                 }
             });
         if (subscription == null)

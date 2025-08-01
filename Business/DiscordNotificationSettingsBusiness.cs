@@ -22,7 +22,7 @@ public class DiscordNotificationSettingsBusiness(
     /// <param name="userId">User ID.</param>
     /// <returns>Discord notification settings DTO or null.</returns>
     public async Task<DiscordNotificationSettingsDto?> GetDiscordNotificationSettingsForUser(
-        int userId)
+        string userId)
     {
         var userNotification =
             await userNotificationRepository.GetUserWithNotificationSettings(userId);
@@ -38,7 +38,7 @@ public class DiscordNotificationSettingsBusiness(
     /// <param name="userId">User ID.</param>
     /// <returns>ID of the created settings.</returns>
     public async Task<int> CreateDiscordNotificationSettingsForUser(
-        CreateDiscordSettingsRequest settings, int userId)
+        CreateDiscordSettingsRequest settings, string userId)
     {
         var entity = mapper.Map<DiscordNotificationSettingsEntity>(settings);
         var id = await userNotificationRepository.UpdateUserDiscordNotificationSettings(userId,
@@ -53,7 +53,7 @@ public class DiscordNotificationSettingsBusiness(
     /// <param name="userId">User ID.</param>
     /// <returns>ID of the updated settings.</returns>
     public async Task<int> UpdateDiscordNotificationSettingsForUser(
-        UpdateDiscordSettingsRequest settings, int userId)
+        UpdateDiscordSettingsRequest settings, string userId)
     {
         var entity = mapper.Map<DiscordNotificationSettingsEntity>(settings);
         var id = await userNotificationRepository.UpdateUserDiscordNotificationSettings(userId,

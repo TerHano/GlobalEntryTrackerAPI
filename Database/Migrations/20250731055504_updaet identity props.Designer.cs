@@ -3,6 +3,7 @@ using System;
 using Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Database.Migrations
 {
     [DbContext(typeof(GlobalEntryTrackerDbContext))]
-    partial class GlobalEntryTrackerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250731055504_updaet identity props")]
+    partial class updaetidentityprops
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -213,8 +216,7 @@ namespace Database.Migrations
 
                     b.Property<string>("Code")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasColumnType("text");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
@@ -367,6 +369,12 @@ namespace Database.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<string>("UserRoleRoleId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("UserRoleUserId")
+                        .HasColumnType("text");
+
                     b.HasKey("Id");
 
                     b.HasIndex("NormalizedEmail")
@@ -375,6 +383,8 @@ namespace Database.Migrations
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
+
+                    b.HasIndex("UserRoleUserId", "UserRoleRoleId");
 
                     b.ToTable("AspNetUsers", (string)null);
                 });
@@ -440,16 +450,26 @@ namespace Database.Migrations
                     b.Property<DateTime?>("NextNotificationAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValue(new DateTime(2025, 8, 1, 19, 31, 10, 822, DateTimeKind.Utc).AddTicks(1370));
+                        .HasDefaultValue(new DateTime(2025, 7, 31, 5, 55, 3, 898, DateTimeKind.Utc).AddTicks(2440));
+
+                    b.Property<int>("UserCustomerId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("UserId")
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("UserNotificationId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UserCustomerId");
 
                     b.HasIndex("UserId")
                         .IsUnique();
+
+                    b.HasIndex("UserNotificationId");
 
                     b.ToTable("UserProfiles");
                 });
@@ -609,6 +629,15 @@ namespace Database.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Database.Entities.UserEntity", b =>
+                {
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUserRole<string>", "UserRole")
+                        .WithMany()
+                        .HasForeignKey("UserRoleUserId", "UserRoleRoleId");
+
+                    b.Navigation("UserRole");
+                });
+
             modelBuilder.Entity("Database.Entities.UserNotificationEntity", b =>
                 {
                     b.HasOne("Database.Entities.NotificationSettings.DiscordNotificationSettingsEntity", "DiscordNotificationSettings")
@@ -634,13 +663,29 @@ namespace Database.Migrations
 
             modelBuilder.Entity("Database.Entities.UserProfileEntity", b =>
                 {
+                    b.HasOne("Database.Entities.UserCustomerEntity", "UserCustomer")
+                        .WithMany()
+                        .HasForeignKey("UserCustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("Database.Entities.UserEntity", "User")
                         .WithOne("UserProfile")
                         .HasForeignKey("Database.Entities.UserProfileEntity", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Database.Entities.UserNotificationEntity", "UserNotification")
+                        .WithMany()
+                        .HasForeignKey("UserNotificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("User");
+
+                    b.Navigation("UserCustomer");
+
+                    b.Navigation("UserNotification");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -708,14 +753,11 @@ namespace Database.Migrations
 
             modelBuilder.Entity("Database.Entities.UserEntity", b =>
                 {
-                    b.Navigation("UserCustomer")
-                        .IsRequired();
+                    b.Navigation("UserCustomer");
 
-                    b.Navigation("UserNotification")
-                        .IsRequired();
+                    b.Navigation("UserNotification");
 
-                    b.Navigation("UserProfile")
-                        .IsRequired();
+                    b.Navigation("UserProfile");
                 });
 #pragma warning restore 612, 618
         }

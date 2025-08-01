@@ -9,7 +9,7 @@ public class UserNotificationRepository(
     IDbContextFactory<GlobalEntryTrackerDbContext> contextFactory,
     ILogger<UserNotificationRepository> logger)
 {
-    public async Task<UserNotificationEntity> GetUserWithNotificationSettings(int userId)
+    public async Task<UserNotificationEntity> GetUserWithNotificationSettings(string userId)
     {
         await using var context = await contextFactory.CreateDbContextAsync();
         var userNotification = await context.UserNotifications
@@ -26,7 +26,7 @@ public class UserNotificationRepository(
         return userNotification;
     }
 
-    public async Task<int> CreateUserNotification(int userId)
+    public async Task<int> CreateUserNotification(string userId)
     {
         await using var context = await contextFactory.CreateDbContextAsync();
         var newUserNotification = await context.UserNotifications.AddAsync(
@@ -38,7 +38,7 @@ public class UserNotificationRepository(
         return newUserNotification.Entity.Id;
     }
 
-    public async Task<int> UpdateUserDiscordNotificationSettings(int userId,
+    public async Task<int> UpdateUserDiscordNotificationSettings(string userId,
         DiscordNotificationSettingsEntity discordNotificationSettingsEntity)
     {
         await using var context = await contextFactory.CreateDbContextAsync();
@@ -60,7 +60,7 @@ public class UserNotificationRepository(
         return userNotification.Id;
     }
 
-    public async Task<int> UpdateUserEmailNotificationSettings(int userId,
+    public async Task<int> UpdateUserEmailNotificationSettings(string userId,
         EmailNotificationSettingsEntity emailNotificationSettingsEntity)
     {
         await using var context = await contextFactory.CreateDbContextAsync();

@@ -14,7 +14,8 @@ namespace Business;
 /// </summary>
 public class UserAppointmentTrackerBusiness(
     TrackedLocationForUserRepository trackedLocationForUserRepository,
-    UserRepository userRepository,
+    UserRoleRepository userRoleRepository,
+    UserProfileRepository userProfileRepository,
     JobService jobService,
     IMapper mapper,
     ILogger<UserAppointmentTrackerBusiness> logger)
@@ -26,7 +27,7 @@ public class UserAppointmentTrackerBusiness(
     /// <param name="userId">User ID.</param>
     /// <returns>Tracked location DTO.</returns>
     public async Task<TrackedLocationForUserDto> GetTrackedAppointmentLocationById(
-        int locationTrackerId, int userId)
+        int locationTrackerId, string userId)
     {
         var trackedLocation =
             await trackedLocationForUserRepository.GetTrackerById(locationTrackerId);
@@ -42,7 +43,7 @@ public class UserAppointmentTrackerBusiness(
     /// <param name="userId">User ID.</param>
     /// <returns>List of tracked location DTOs.</returns>
     public async Task<List<TrackedLocationForUserDto>> GetTrackedAppointmentLocationsForUser(
-        int userId)
+        string userId)
     {
         var trackedLocations =
             await trackedLocationForUserRepository.GetTrackedLocationsForUser(userId);
@@ -55,10 +56,10 @@ public class UserAppointmentTrackerBusiness(
     /// <param name="request">Tracker creation request.</param>
     /// <param name="userId">User ID.</param>
     /// <returns>ID of the new tracker.</returns>
-    public async Task<int> CreateTrackerForUser(CreateTrackerForUserRequest request, int userId)
+    public async Task<int> CreateTrackerForUser(CreateTrackerForUserRequest request, string userId)
     {
-        var user = await userRepository.GetUserById(userId);
-        var maxTrackers = user.UserRole.Role.MaxTrackers;
+        var userRoles = await userRoleRepository.GetUserRoleByUserId(userId);
+        var maxTrackers = userRoles.Max(x => x.MaxTrackers);
         var trackedLocationsForUser =
             await trackedLocationForUserRepository.GetTrackedLocationsForUser(userId);
         if (await DoesUserAlreadyHaveTrackerForLocationAndNotificationType(
@@ -101,7 +102,7 @@ public class UserAppointmentTrackerBusiness(
     /// <param name="request">Tracker update request.</param>
     /// <param name="userId">User ID.</param>
     /// <returns>ID of the updated tracker.</returns>
-    public async Task<int> UpdateTrackerForUser(UpdateTrackerForUserRequest request, int userId)
+    public async Task<int> UpdateTrackerForUser(UpdateTrackerForUserRequest request, string userId)
     {
         var trackedLocation =
             await trackedLocationForUserRepository.GetTrackerById(request.Id);
@@ -134,7 +135,7 @@ public class UserAppointmentTrackerBusiness(
     /// <param name="locationTrackerId">Tracker ID.</param>
     /// <param name="userId">User ID.</param>
     /// <returns>ID of the deleted tracker.</returns>
-    public async Task<int> DeleteTrackerForUser(int locationTrackerId, int userId)
+    public async Task<int> DeleteTrackerForUser(int locationTrackerId, string userId)
     {
         return await trackedLocationForUserRepository.DeleteTrackerForUser(locationTrackerId,
             userId);
@@ -144,7 +145,7 @@ public class UserAppointmentTrackerBusiness(
     ///     Deletes all trackers for a user.
     /// </summary>
     /// <param name="userId">User ID.</param>
-    public async Task DeleteAllTrackersForUser(int userId)
+    public async Task DeleteAllTrackersForUser(string userId)
     {
         await trackedLocationForUserRepository.DeleteAllTrackersForUser(userId);
     }
@@ -158,7 +159,7 @@ public class UserAppointmentTrackerBusiness(
     /// <param name="trackerId">Optional tracker ID to exclude from check.</param>
     /// <returns>True if a tracker exists; otherwise, false.</returns>
     private async Task<bool> DoesUserAlreadyHaveTrackerForLocationAndNotificationType(
-        int userId, int locationId, int notificationTypeId, int trackerId = 0)
+        string userId, int locationId, int notificationTypeId, int trackerId = 0)
     {
         var trackedLocations = await
             trackedLocationForUserRepository.GetTrackedLocationsForUser(userId);

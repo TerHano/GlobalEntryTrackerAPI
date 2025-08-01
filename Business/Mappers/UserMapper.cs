@@ -10,14 +10,19 @@ public class UserMapper : Profile
 {
     public UserMapper()
     {
-        CreateMap<UserEntity, UserDto>().ForMember(x => x.Role,
-            opt => opt.MapFrom(src => src.UserRole.Role));
-        CreateMap<UserEntity, UserDtoForAdmin>().ForMember(x => x.Role,
-                opt => opt.MapFrom(src => src.UserRole.Role))
-            .ForMember(x => x.CustomerId, opt => opt.MapFrom(src => src.UserCustomer.CustomerId))
+        CreateMap<RoleEntity, RoleDto>()
+            .ForMember(x => x.Id, opt => opt.MapFrom(src => src.Id))
+            .ForMember(x => x.Name, opt => opt.MapFrom(src => src.Name))
+            .ForMember(x => x.Code, opt => opt.MapFrom(src => src.Code));
+        CreateMap<UserProfileEntity, UserDto>().ForMember(x => x.Role,
+            opt => opt.MapFrom(src => src.User.UserRoles.First()));
+        CreateMap<UserProfileEntity, UserDtoForAdmin>().ForMember(x => x.Role,
+                opt => opt.MapFrom(src => src.User.UserRoles.First()))
+            .ForMember(x => x.CustomerId,
+                opt => opt.MapFrom(src => src.User.UserCustomer.CustomerId))
             .ForMember(x => x.SubscriptionId,
-                opt => opt.MapFrom(src => src.UserCustomer.SubscriptionId));
-        CreateMap<CreateUserRequest, UserEntity>();
-        CreateMap<UpdateUserRequest, UserEntity>();
+                opt => opt.MapFrom(src => src.User.UserCustomer.SubscriptionId));
+        CreateMap<CreateUserRequest, UserProfileEntity>();
+        CreateMap<UpdateUserRequest, UserProfileEntity>();
     }
 }

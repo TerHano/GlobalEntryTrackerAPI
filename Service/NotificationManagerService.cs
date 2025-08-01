@@ -14,7 +14,7 @@ public class NotificationManagerService(
 {
     public async Task SendAppointmentAvailableNotifications(
         List<LocationAppointmentDto> locationAppointments,
-        AppointmentLocationEntity appointmentLocation, int userId)
+        AppointmentLocationEntity appointmentLocation, string userId)
     {
         var userNotification =
             await userNotificationRepository.GetUserWithNotificationSettings(userId);

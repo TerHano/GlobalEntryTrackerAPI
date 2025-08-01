@@ -14,7 +14,7 @@ namespace Business;
 public class EmailNotificationSettingsBusiness(
     UserNotificationRepository userNotificationRepository,
     NotificationManagerService notificationManager,
-    UserRepository userRepository,
+    UserProfileRepository userProfileRepository,
     IMapper mapper) : IEmailNotificationSettingsBusiness
 {
     /// <summary>
@@ -23,7 +23,7 @@ public class EmailNotificationSettingsBusiness(
     /// <param name="userId">User ID.</param>
     /// <returns>Email notification settings DTO or null.</returns>
     public async Task<EmailNotificationSettingsDto?> GetEmailNotificationSettingsForUser(
-        int userId)
+        string userId)
     {
         var userNotification =
             await userNotificationRepository.GetUserWithNotificationSettings(userId);
@@ -38,9 +38,9 @@ public class EmailNotificationSettingsBusiness(
     /// <param name="userId">User ID.</param>
     /// <returns>ID of the created settings.</returns>
     public async Task<int> CreateEmailNotificationSettingsForUser(
-        CreateEmailNotificationSettingsRequest settings, int userId)
+        CreateEmailNotificationSettingsRequest settings, string userId)
     {
-        var user = await userRepository.GetUserById(userId);
+        var user = await userProfileRepository.GetUserProfileById(userId);
         var entity = mapper.Map<EmailNotificationSettingsEntity>(settings);
         entity.Email = user.Email;
         var id = await userNotificationRepository.UpdateUserEmailNotificationSettings(userId,
@@ -55,10 +55,10 @@ public class EmailNotificationSettingsBusiness(
     /// <param name="userId">User ID.</param>
     /// <returns>ID of the updated settings.</returns>
     public async Task<int> UpdateEmailNotificationSettingsForUser(
-        UpdateEmailNotificationSettingsRequest settings, int userId)
+        UpdateEmailNotificationSettingsRequest settings, string userId)
     {
         var entity = mapper.Map<EmailNotificationSettingsEntity>(settings);
-        var user = await userRepository.GetUserById(userId);
+        var user = await userProfileRepository.GetUserProfileById(userId);
         entity.Email = user.Email;
         var id = await userNotificationRepository.UpdateUserEmailNotificationSettings(userId,
             entity);
@@ -69,9 +69,9 @@ public class EmailNotificationSettingsBusiness(
     ///     Sends a test email message to the user.
     /// </summary>
     /// <param name="userId">User ID.</param>
-    public async Task SendEmailTestMessage(int userId)
+    public async Task SendEmailTestMessage(string userId)
     {
-        var user = await userRepository.GetUserById(userId);
+        var user = await userProfileRepository.GetUserProfileById(userId);
         if (user == null)
             throw new Exception($"User with ID {userId} not found.");
         await notificationManager.SendTestMessageForService(NotificationServiceType.Email,

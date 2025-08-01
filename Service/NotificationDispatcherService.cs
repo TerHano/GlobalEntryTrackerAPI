@@ -1,5 +1,6 @@
 using Database.Entities;
 using Database.Repositories;
+using Microsoft.AspNetCore.Identity;
 using Service.Dto;
 
 namespace Service;
@@ -7,9 +8,10 @@ namespace Service;
 public class NotificationDispatcherService(
     NotificationManagerService notificationManagerService,
     UserAppointmentValidationService userAppointmentValidationService,
+    RoleManager<RoleEntity> roleManager,
     UserRoleService userRoleService,
     TrackedLocationForUserRepository trackedLocationForUserRepository,
-    UserRepository userRepository,
+    UserProfileRepository userProfileRepository,
     AppointmentLocationRepository appointmentLocationRepository)
 {
     //Create method that checks if a list of appointments is valid for each user tracking the location and then send a notification
@@ -43,10 +45,14 @@ public class NotificationDispatcherService(
     private async Task UpdateNextNotificationTimeBasedOnRole(
         List<TrackedLocationForUserEntity> trackers)
     {
-        var users = trackers.Select(x => x.User).Distinct().ToList();
-        foreach (var user in users) userRoleService.UpdateNextNotificationTimeForUser(user);
-
-        await userRepository.UpdateMultipleUsers(users);
+        var roles = roleManager.Roles.ToList();
+        var userProfiles =
+            await userProfileRepository.GetUserProfileByIds(trackers.Select(x => x.UserId)
+                .Distinct()
+                .ToList());
+        foreach (var user in userProfiles)
+            userRoleService.UpdateNextNotificationTimeForUser(user, roles);
+        await userProfileRepository.UpdateMultipleUserProfiles(userProfiles);
     }
 
     //Update LastSeen Earliest Appointment for each user

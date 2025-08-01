@@ -42,21 +42,22 @@ public class TrackedLocationForUserRepository(
     public async Task<List<TrackedLocationForUserEntity>> GetTrackersByLocationIdDueForNotification(
         int locationId)
     {
-        using var context = await contextFactory.CreateDbContextAsync();
+        await using var context = await contextFactory.CreateDbContextAsync();
         var now = DateTime.UtcNow;
         return await context.UserTrackedLocations.Include(x => x.NotificationType)
             .Include(x => x.Location)
             .Include(x => x.User)
-            .ThenInclude(x => x.UserRole)
-            .ThenInclude(x => x.Role)
-            .Where(x => x.Enabled && x.LocationId == locationId && x.User.NextNotificationAt < now)
+            .ThenInclude(x => x.UserProfile)
+            .Where(x =>
+                x.Enabled && x.LocationId == locationId &&
+                x.User.UserProfile.NextNotificationAt < now)
             .ToListAsync();
     }
 
     /// <summary>
     ///     Retrieves all tracked locations for a specific user.
     /// </summary>
-    public async Task<List<TrackedLocationForUserEntity>> GetTrackedLocationsForUser(int userId)
+    public async Task<List<TrackedLocationForUserEntity>> GetTrackedLocationsForUser(string userId)
     {
         await using var context = await contextFactory.CreateDbContextAsync();
         return await context.UserTrackedLocations.Include(x => x.NotificationType)
@@ -136,7 +137,7 @@ public class TrackedLocationForUserRepository(
     /// <summary>
     ///     Deletes a tracker for a user by tracker ID.
     /// </summary>
-    public async Task<int> DeleteTrackerForUser(int trackerId, int userId)
+    public async Task<int> DeleteTrackerForUser(int trackerId, string userId)
     {
         try
         {
@@ -161,7 +162,7 @@ public class TrackedLocationForUserRepository(
     /// <summary>
     ///     Deletes all trackers for a specific user.
     /// </summary>
-    public async Task DeleteAllTrackersForUser(int userId)
+    public async Task DeleteAllTrackersForUser(string userId)
     {
         await using var context = await contextFactory.CreateDbContextAsync();
         var trackedLocations = await context.UserTrackedLocations

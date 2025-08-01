@@ -4,9 +4,14 @@ namespace Service;
 
 public class UserRoleService
 {
-    public void UpdateNextNotificationTimeForUser(UserEntity user)
+    public void UpdateNextNotificationTimeForUser(UserProfileEntity userProfileEntity,
+        List<RoleEntity> roles)
     {
-        user.NextNotificationAt =
-            DateTime.UtcNow.AddMinutes(user.UserRole.Role.NotificationIntervalInMinutes);
+        var userRole = userProfileEntity.User.UserRoles?.FirstOrDefault();
+        var roleInfo = roles.Find(x => x.Id == userRole?.Id);
+        if (roleInfo == null)
+            throw new Exception($"Role {userRole?.Id} doesn't exist");
+        userProfileEntity.User.UserProfile.NextNotificationAt =
+            DateTime.UtcNow.AddMinutes(roleInfo.NotificationIntervalInMinutes);
     }
 }

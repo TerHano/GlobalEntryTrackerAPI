@@ -8,7 +8,7 @@ public class UserCustomerRepository(
     IDbContextFactory<GlobalEntryTrackerDbContext> contextFactory,
     ILogger<UserCustomerRepository> logger)
 {
-    public async Task<UserCustomerEntity?> GetCustomerDetailsForUser(int userId)
+    public async Task<UserCustomerEntity?> GetCustomerDetailsForUser(string userId)
     {
         await using var context = await contextFactory.CreateDbContextAsync();
         var userCustomer = await context.UserCustomers.FirstOrDefaultAsync(x => x.UserId == userId);
