@@ -9,6 +9,15 @@ public class UserNotificationRepository(
     IDbContextFactory<GlobalEntryTrackerDbContext> contextFactory,
     ILogger<UserNotificationRepository> logger)
 {
+    public async Task<UserNotificationEntity> GetById(int notificationId)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        var notification = await context.UserNotifications.FindAsync(notificationId);
+        if (notification is not null) return notification;
+        logger.LogError("UserNotification does not exist");
+        throw new NullReferenceException("UserNotification does not exist");
+    }
+
     public async Task<UserNotificationEntity> GetUserWithNotificationSettings(string userId)
     {
         await using var context = await contextFactory.CreateDbContextAsync();
@@ -53,8 +62,6 @@ public class UserNotificationRepository(
         if (userNotification.DiscordNotificationSettingsId.HasValue &&
             userNotification.DiscordNotificationSettingsId != discordNotificationSettingsEntity.Id)
             throw new UnauthorizedAccessException("No access to this notification settings");
-
-        discordNotificationSettingsEntity.UserNotificationId = userNotification.Id;
         userNotification.DiscordNotificationSettings = discordNotificationSettingsEntity;
         await context.SaveChangesAsync();
         return userNotification.Id;
@@ -75,8 +82,6 @@ public class UserNotificationRepository(
         if (userNotification.EmailNotificationSettingsId.HasValue &&
             userNotification.EmailNotificationSettingsId != emailNotificationSettingsEntity.Id)
             throw new UnauthorizedAccessException("No access to this notification settings");
-
-        emailNotificationSettingsEntity.UserNotificationId = userNotification.Id;
         userNotification.EmailNotificationSettings = emailNotificationSettingsEntity;
         await context.SaveChangesAsync();
         return emailNotificationSettingsEntity.Id;

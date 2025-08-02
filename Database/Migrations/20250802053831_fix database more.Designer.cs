@@ -3,6 +3,7 @@ using System;
 using Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Database.Migrations
 {
     [DbContext(typeof(GlobalEntryTrackerDbContext))]
-    partial class GlobalEntryTrackerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250802053831_fix database more")]
+    partial class fixdatabasemore
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -113,12 +116,18 @@ namespace Database.Migrations
                     b.Property<bool>("Enabled")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("UserNotificationId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("WebhookUrl")
                         .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("UserNotificationId")
+                        .IsUnique();
 
                     b.ToTable("DiscordNotificationSettings");
                 });
@@ -138,7 +147,13 @@ namespace Database.Migrations
                     b.Property<bool>("Enabled")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("UserNotificationId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UserNotificationId")
+                        .IsUnique();
 
                     b.ToTable("EmailNotificationSettings");
                 });
@@ -393,12 +408,6 @@ namespace Database.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DiscordNotificationSettingsId")
-                        .IsUnique();
-
-                    b.HasIndex("EmailNotificationSettingsId")
-                        .IsUnique();
-
                     b.HasIndex("UserId")
                         .IsUnique();
 
@@ -434,7 +443,7 @@ namespace Database.Migrations
                     b.Property<DateTime?>("NextNotificationAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValue(new DateTime(2025, 8, 2, 5, 52, 56, 138, DateTimeKind.Utc).AddTicks(3400));
+                        .HasDefaultValue(new DateTime(2025, 8, 2, 5, 38, 31, 589, DateTimeKind.Utc).AddTicks(2140));
 
                     b.Property<string>("UserId")
                         .IsRequired()
@@ -565,6 +574,28 @@ namespace Database.Migrations
                     b.Navigation("Location");
                 });
 
+            modelBuilder.Entity("Database.Entities.NotificationSettings.DiscordNotificationSettingsEntity", b =>
+                {
+                    b.HasOne("Database.Entities.UserNotificationEntity", "UserNotification")
+                        .WithOne("DiscordNotificationSettings")
+                        .HasForeignKey("Database.Entities.NotificationSettings.DiscordNotificationSettingsEntity", "UserNotificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("UserNotification");
+                });
+
+            modelBuilder.Entity("Database.Entities.NotificationSettings.EmailNotificationSettingsEntity", b =>
+                {
+                    b.HasOne("Database.Entities.UserNotificationEntity", "UserNotification")
+                        .WithOne("EmailNotificationSettings")
+                        .HasForeignKey("Database.Entities.NotificationSettings.EmailNotificationSettingsEntity", "UserNotificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("UserNotification");
+                });
+
             modelBuilder.Entity("Database.Entities.TrackedLocationForUserEntity", b =>
                 {
                     b.HasOne("Database.Entities.AppointmentLocationEntity", "Location")
@@ -605,23 +636,11 @@ namespace Database.Migrations
 
             modelBuilder.Entity("Database.Entities.UserNotificationEntity", b =>
                 {
-                    b.HasOne("Database.Entities.NotificationSettings.DiscordNotificationSettingsEntity", "DiscordNotificationSettings")
-                        .WithOne("UserNotification")
-                        .HasForeignKey("Database.Entities.UserNotificationEntity", "DiscordNotificationSettingsId");
-
-                    b.HasOne("Database.Entities.NotificationSettings.EmailNotificationSettingsEntity", "EmailNotificationSettings")
-                        .WithOne("UserNotification")
-                        .HasForeignKey("Database.Entities.UserNotificationEntity", "EmailNotificationSettingsId");
-
                     b.HasOne("Database.Entities.UserEntity", "User")
                         .WithOne("UserNotification")
                         .HasForeignKey("Database.Entities.UserNotificationEntity", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("DiscordNotificationSettings");
-
-                    b.Navigation("EmailNotificationSettings");
 
                     b.Navigation("User");
                 });
@@ -688,18 +707,6 @@ namespace Database.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Database.Entities.NotificationSettings.DiscordNotificationSettingsEntity", b =>
-                {
-                    b.Navigation("UserNotification")
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Database.Entities.NotificationSettings.EmailNotificationSettingsEntity", b =>
-                {
-                    b.Navigation("UserNotification")
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Database.Entities.UserEntity", b =>
                 {
                     b.Navigation("UserCustomer")
@@ -710,6 +717,13 @@ namespace Database.Migrations
 
                     b.Navigation("UserProfile")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Database.Entities.UserNotificationEntity", b =>
+                {
+                    b.Navigation("DiscordNotificationSettings");
+
+                    b.Navigation("EmailNotificationSettings");
                 });
 #pragma warning restore 612, 618
         }

@@ -3,6 +3,7 @@ using System;
 using Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Database.Migrations
 {
     [DbContext(typeof(GlobalEntryTrackerDbContext))]
-    partial class GlobalEntryTrackerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250802051423_fix db setup")]
+    partial class fixdbsetup
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -113,6 +116,9 @@ namespace Database.Migrations
                     b.Property<bool>("Enabled")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("UserNotificationId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("WebhookUrl")
                         .IsRequired()
                         .HasMaxLength(2000)
@@ -120,7 +126,7 @@ namespace Database.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("DiscordNotificationSettings");
+                    b.ToTable("DiscordNotifications");
                 });
 
             modelBuilder.Entity("Database.Entities.NotificationSettings.EmailNotificationSettingsEntity", b =>
@@ -137,6 +143,9 @@ namespace Database.Migrations
 
                     b.Property<bool>("Enabled")
                         .HasColumnType("boolean");
+
+                    b.Property<int>("UserNotificationId")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -434,7 +443,7 @@ namespace Database.Migrations
                     b.Property<DateTime?>("NextNotificationAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValue(new DateTime(2025, 8, 2, 5, 52, 56, 138, DateTimeKind.Utc).AddTicks(3400));
+                        .HasDefaultValue(new DateTime(2025, 8, 2, 5, 14, 23, 235, DateTimeKind.Utc).AddTicks(8750));
 
                     b.Property<string>("UserId")
                         .IsRequired()

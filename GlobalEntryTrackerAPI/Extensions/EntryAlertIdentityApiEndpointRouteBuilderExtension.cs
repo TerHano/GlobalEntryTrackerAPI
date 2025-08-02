@@ -8,6 +8,8 @@ using System.Text;
 using System.Text.Encodings.Web;
 using Business;
 using Business.Dto.Requests;
+using Business.Exceptions;
+using Database.Entities;
 using Database.Enums;
 using GlobalEntryTrackerAPI.Models;
 using Microsoft.AspNetCore.Authentication.BearerToken;
@@ -106,14 +108,14 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
 
         routeGroup.MapPost("/login",
                 async Task<Results<Ok<AccessTokenResponse>, EmptyHttpResult, ProblemHttpResult>>
-                ([FromBody] LoginRequest login, [FromQuery] bool? useCookies,
-                    [FromQuery] bool? useSessionCookies, [FromServices] IServiceProvider sp) =>
+                    ([FromBody] LoginRequest login, [FromServices] IServiceProvider sp) =>
                 {
-                    useCookies = true;
+                    var useCookies = true;
+                    var useSessionCookies = false;
                     var signInManager = sp.GetRequiredService<SignInManager<TUser>>();
 
-                    var useCookieScheme = useCookies == true || useSessionCookies == true;
-                    var isPersistent = useCookies == true && useSessionCookies != true;
+                    var useCookieScheme = useCookies || useSessionCookies;
+                    var isPersistent = useCookies && useSessionCookies != true;
                     signInManager.AuthenticationScheme = useCookieScheme
                         ? IdentityConstants.ApplicationScheme
                         : IdentityConstants.BearerScheme;
@@ -133,12 +135,13 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
                     }
 
                     if (!result.Succeeded)
-                        return TypedResults.Problem(result.ToString(),
-                            statusCode: StatusCodes.Status401Unauthorized);
-
+                        throw new IncorrectLoginInformationException("Wrong email or password.");
+                    // return TypedResults.Problem(result.ToString(),
+                    //     statusCode: StatusCodes.Status401Unauthorized);
                     // The signInManager already produced the needed response in the form of a cookie or bearer token.
                     return TypedResults.Empty;
-                }).WithTags("Authentication")
+                })
+            .WithTags("Authentication")
             .WithName("SignIn")
             .WithSummary("Authenticate a user and obtain a token")
             .WithDescription(
@@ -146,7 +149,15 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
             .Accepts<SignInRequest>("application/json")
             .Produces<ApiResponse<object>>()
             .Produces<ApiResponse<object>>(StatusCodes.Status400BadRequest);
-        ;
+
+
+        routeGroup.MapPost("/logout", async (SignInManager<UserEntity> signInManager) =>
+            {
+                await signInManager.SignOutAsync();
+                return Results.Ok();
+            })
+            .WithOpenApi()
+            .RequireAuthorization();
 
         routeGroup.MapPost("/refresh",
             async Task<Results<Ok<AccessTokenResponse>, UnauthorizedHttpResult, SignInHttpResult,

@@ -16,10 +16,8 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
     public DbSet<RoleEntity> Roles { get; set; }
     public DbSet<UserNotificationEntity> UserNotifications { get; set; }
     public DbSet<TrackedLocationForUserEntity> UserTrackedLocations { get; set; }
-    public DbSet<DiscordNotificationSettingsEntity> DiscordNotifications { get; set; }
-    public DbSet<NotificationTypeEntity> NotificationTypes { get; set; }
     public DbSet<DiscordNotificationSettingsEntity> DiscordNotificationSettings { get; set; }
-
+    public DbSet<NotificationTypeEntity> NotificationTypes { get; set; }
     public DbSet<EmailNotificationSettingsEntity> EmailNotificationSettings { get; set; }
 
     public DbSet<UserCustomerEntity> UserCustomers { get; set; }
@@ -48,35 +46,12 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
             .WithMany()
             .HasForeignKey(e => e.UserId);
 
-        modelBuilder.Entity<DiscordNotificationSettingsEntity>()
-            .HasOne(d => d.UserNotification)
-            .WithOne(u => u.DiscordNotificationSettings)
-            .HasForeignKey<DiscordNotificationSettingsEntity>(d => d.UserNotificationId)
-            .IsRequired();
-
-
-        modelBuilder.Entity<EmailNotificationSettingsEntity>()
-            .HasOne(d => d.UserNotification)
-            .WithOne(u => u.EmailNotificationSettings)
-            .HasForeignKey<EmailNotificationSettingsEntity>(d => d.UserNotificationId)
-            .IsRequired();
-
-
         modelBuilder.Entity<UserNotificationEntity>()
             .HasOne(e => e.DiscordNotificationSettings)
-            .WithOne(e => e.UserNotification)
-            .HasForeignKey<UserNotificationEntity>(e => e.DiscordNotificationSettingsId);
-
+            .WithOne(e => e.UserNotification);
         modelBuilder.Entity<UserNotificationEntity>()
             .HasOne(e => e.EmailNotificationSettings)
-            .WithOne(e => e.UserNotification)
-            .HasForeignKey<UserNotificationEntity>(e => e.EmailNotificationSettingsId);
-
-
-        modelBuilder.Entity<UserNotificationEntity>()
-            .HasOne(e => e.EmailNotificationSettings)
-            .WithOne(e => e.UserNotification)
-            .HasForeignKey<UserNotificationEntity>(e => e.EmailNotificationSettingsId);
+            .WithOne(e => e.UserNotification);
 
         modelBuilder.Entity<UserProfileEntity>().Property(u => u.NextNotificationAt)
             .HasDefaultValue(DateTime.UtcNow);

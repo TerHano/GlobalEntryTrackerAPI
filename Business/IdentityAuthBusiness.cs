@@ -77,10 +77,11 @@ public class IdentityAuthBusiness(
         };
         await userProfileRepository.CreateUserProfile(newUser);
         var notificationId = await userNotificationRepository.CreateUserNotification(userId);
+        var notification = await userNotificationRepository.GetById(notificationId);
         await userNotificationRepository.UpdateUserEmailNotificationSettings(userId,
             new EmailNotificationSettingsEntity
             {
-                UserNotificationId = notificationId,
+                UserNotification = notification,
                 Email = request.Email,
                 Enabled = false
             });
