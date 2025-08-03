@@ -50,10 +50,9 @@ public static class AdminEndpoints
 
         // Delete: User by userId
         app.MapDelete("/api/v1/admin/user/{userId}",
-                async (string userId, AuthBusiness authBusiness) =>
+                async (string userId, IAuthBusiness authBusiness) =>
                 {
-                    var userIdInt = int.Parse(userId);
-                    await authBusiness.DeleteUserById(userIdInt);
+                    await authBusiness.DeleteUserById(userId);
                     return Results.Ok();
                 })
             .RequireAuthorization("Admin")

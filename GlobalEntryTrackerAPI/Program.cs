@@ -1,21 +1,21 @@
 using System.Net;
 using System.Net.Mail;
-using System.Text;
 using System.Text.Json;
 using Business;
 using Business.Mappers;
 using Database;
+using Database.Entities;
 using Database.Repositories;
 using GlobalEntryTrackerAPI.Endpoints;
 using GlobalEntryTrackerAPI.Endpoints.Notifications;
 using GlobalEntryTrackerAPI.Enum;
+using GlobalEntryTrackerAPI.Extensions;
 using GlobalEntryTrackerAPI.Middleware;
 using GlobalEntryTrackerAPI.Util;
 using GlobalEntryTrackerAPI.Webhooks;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Quartz;
 using Quartz.AspNetCore;
@@ -59,6 +59,11 @@ builder.Services.AddDbContextFactory<GlobalEntryTrackerDbContext>(opt =>
 {
     opt.UseNpgsql(connectionString);
     opt.EnableSensitiveDataLogging();
+    opt.UseSeeding((context, _) => { SeedUtil.Seed(context); });
+    opt.UseAsyncSeeding(async (context, _, cancellationToken) =>
+    {
+        await SeedUtil.SeedAsync(context, cancellationToken);
+    });
 });
 
 builder.Services.AddMemoryCache();
@@ -66,7 +71,7 @@ builder.Services.AddMemoryCache();
 builder.Services.AddScoped<AppointmentLocationRepository>();
 builder.Services.AddScoped<TrackedLocationForUserRepository>();
 builder.Services.AddScoped<NotificationTypeRepository>();
-builder.Services.AddScoped<UserRepository>();
+builder.Services.AddScoped<UserProfileRepository>();
 builder.Services.AddScoped<UserRoleRepository>();
 builder.Services.AddScoped<UserCustomerRepository>();
 builder.Services.AddScoped<PlanOptionRepository>();
@@ -87,7 +92,7 @@ builder.Services.AddScoped<NotificationManagerService>();
 builder.Services.AddScoped<NotificationDispatcherService>();
 builder.Services.AddScoped<SubscriptionBusiness>();
 builder.Services.AddScoped<PlanBusiness>();
-builder.Services.AddScoped<AuthBusiness>();
+builder.Services.AddScoped<IAuthBusiness, IdentityAuthBusiness>();
 builder.Services.AddScoped<RoleBusiness>();
 
 builder.Services.AddScoped<UserAppointmentValidationService>();
@@ -164,37 +169,6 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 
-var authIssuer = builder.Configuration.GetValue<string>("Auth:Issuer");
-var authAudience = builder.Configuration.GetValue<string>("Auth:Audience");
-var authSigningKey = builder.Configuration.GetValue<string>("Auth:Signing_Key");
-builder.Services.AddAuthentication(options =>
-{
-    // Identity made Cookie authentication the default.
-    // However, we want JWT Bearer Auth to be the default.
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-}).AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = false,
-        ValidateAudience = false,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = authIssuer,
-        //ValidAudience = authAudience,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authSigningKey))
-    };
-    options.Events = new JwtBearerEvents
-    {
-        OnTokenValidated = async context =>
-        {
-            // Get user ID from the JWT's claims (e.g., "sub" claim)
-            await AuthUtil.OnJWTValidate(context);
-        }
-    };
-});
-
 builder.Services.AddQuartz(q =>
 {
     // Use a dedicated thread pool for Quartz jobs.
@@ -203,15 +177,6 @@ builder.Services.AddQuartz(q =>
 
     q.UseInMemoryStore();
 
-    // q.UsePersistentStore(options =>
-    // {
-    //     
-    //     options.UseProperties = false; // Use property-based storage
-    //     //use memory store for testing
-    //     options.UseClustering(); // Enable clustering if needed
-    //     options.UsePostgres(connectionString); // Use SQL Server
-    //     options.UseNewtonsoftJsonSerializer();
-    // });
 
     var jobKey = new JobKey("ActiveJobManagerJob");
     q.AddJob<ActiveJobManagerJob>(opts => opts.WithIdentity(jobKey));
@@ -231,20 +196,28 @@ builder.Services.AddQuartzServer(options =>
     options.WaitForJobsToComplete = true;
 });
 
+builder.Services.AddIdentityApiEndpoints<UserEntity>(op =>
+    {
+        op.SignIn.RequireConfirmedEmail = false;
+    })
+    .AddRoles<RoleEntity>()
+    .AddEntityFrameworkStores<GlobalEntryTrackerDbContext>()
+    .AddDefaultTokenProviders();
+
 var app = builder.Build();
 
 // Place this before app.UseAuthentication();
-app.Use(async (context, next) =>
-{
-    var token = context.Request.Cookies[AuthCookie.AccessTokenName];
-    if (!string.IsNullOrEmpty(token)) context.Request.Headers.Authorization = $"Bearer {token}";
-    await next();
-});
+// app.Use(async (context, next) =>
+// {
+//     var token = context.Request.Cookies[AuthCookie.AccessTokenName];
+//     if (!string.IsNullOrEmpty(token)) context.Request.Headers.Authorization = $"Bearer {token}";
+//     await next();
+// });
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment()) app.UseSwagger();
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 //app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 
 app.UseCors(globalEntryTrackerPolicy);
@@ -260,6 +233,8 @@ app.MapNotificationSettingsEndpoints();
 app.MapUserEndpoints();
 app.MapStripeWebHooks();
 app.MapAdminEndpoints();
+app.MapEntryAlertIdentityApi<UserEntity>();
+
 
 //Notification endpoints
 app.MapDiscordNotificationEndpoints();
@@ -267,5 +242,16 @@ app.MapEmailNotificationEndpoints();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+
+using (var scope = app.Services.CreateScope())
+{
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<RoleEntity>>();
+    if (!roleManager.Roles.Any())
+    {
+        var roles = SeedUtil.GetRoles();
+        foreach (var roleEntity in roles) await roleManager.CreateAsync(roleEntity);
+    }
+}
 
 app.Run();

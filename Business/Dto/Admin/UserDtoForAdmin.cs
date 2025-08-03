@@ -4,7 +4,7 @@ namespace Business.Dto.Admin;
 
 public class UserDtoForAdmin
 {
-    [Required] public int Id { get; init; }
+    [Required] public string Id { get; init; }
 
     public required string ExternalId { get; set; }
 

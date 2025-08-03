@@ -11,7 +11,7 @@ public interface IEmailNotificationSettingsBusiness
     /// <param name="userId">User ID.</param>
     /// <returns>Email notification settings DTO or null.</returns>
     public Task<EmailNotificationSettingsDto?> GetEmailNotificationSettingsForUser(
-        int userId);
+        string userId);
 
 
     /// <summary>
@@ -21,7 +21,7 @@ public interface IEmailNotificationSettingsBusiness
     /// <param name="userId">User ID.</param>
     /// <returns>ID of the created settings.</returns>
     public Task<int> CreateEmailNotificationSettingsForUser(
-        CreateEmailNotificationSettingsRequest settings, int userId);
+        CreateEmailNotificationSettingsRequest settings, string userId);
 
     /// <summary>
     ///     Updates email notification settings for a user.
@@ -30,11 +30,11 @@ public interface IEmailNotificationSettingsBusiness
     /// <param name="userId">User ID.</param>
     /// <returns>ID of the updated settings.</returns>
     public Task<int> UpdateEmailNotificationSettingsForUser(
-        UpdateEmailNotificationSettingsRequest settings, int userId);
+        UpdateEmailNotificationSettingsRequest settings, string userId);
 
     /// <summary>
     ///     Sends a test email message to the user.
     /// </summary>
     /// <param name="userId">User ID.</param>
-    public Task SendEmailTestMessage(int userId);
+    public Task SendEmailTestMessage(string userId);
 }

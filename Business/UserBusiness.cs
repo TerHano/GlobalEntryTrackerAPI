@@ -5,6 +5,7 @@ using Business.Dto.NotificationSettings;
 using Database.Entities;
 using Database.Enums;
 using Database.Repositories;
+using Microsoft.AspNetCore.Identity;
 using Quartz;
 
 namespace Business;
@@ -14,17 +15,18 @@ namespace Business;
 /// </summary>
 public class UserBusiness(
     TrackedLocationForUserRepository trackedLocationRepository,
-    UserRepository userRepository,
+    UserProfileRepository userProfileRepository,
     UserNotificationRepository userNotificationRepository,
     UserRoleRepository userRoleRepository,
     ISchedulerFactory schedulerFactory,
+    UserManager<UserEntity> userManager,
     IMapper mapper)
 {
     //get all users for admin
-    public async Task<List<UserDtoForAdmin>> GetAllUsersForAdmin(int userId,
+    public async Task<List<UserDtoForAdmin>> GetAllUsersForAdmin(string userId,
         bool includeSelf = false)
     {
-        var users = await userRepository.GetAllUsersForAdmin(userId, includeSelf);
+        var users = await userProfileRepository.GetAllUserProfilesForAdmin(userId, includeSelf);
         return mapper.Map<List<UserDtoForAdmin>>(users);
     }
 
@@ -34,9 +36,9 @@ public class UserBusiness(
     /// </summary>
     /// <param name="userId">User ID.</param>
     /// <returns>User DTO.</returns>
-    public async Task<UserDto> GetUserById(int userId)
+    public async Task<UserDto> GetUserById(string userId)
     {
-        var user = await userRepository.GetUserById(userId);
+        var user = await userProfileRepository.GetUserProfileById(userId, true);
         return mapper.Map<UserDto>(user);
     }
 
@@ -45,16 +47,18 @@ public class UserBusiness(
     /// </summary>
     /// <param name="userId">User ID.</param>
     /// <returns>DateTime of the next notification check, or null.</returns>
-    public async Task<DateTime?> GetNextNotificationCheckForUser(int userId)
+    public async Task<DateTime?> GetNextNotificationCheckForUser(string userId)
     {
-        var user = await userRepository.GetUserById(userId);
+        var userProfileEntity = await userProfileRepository.GetUserProfileById(userId);
+        if (userProfileEntity == null)
+            throw new NullReferenceException("User Profile does not exist");
         var activeTrackersForUser =
             await trackedLocationRepository.GetTrackedLocationsForUser(userId);
         if (activeTrackersForUser.Count == 0 ||
             activeTrackersForUser.All(x => x.Enabled == false))
             return null;
-        var nextNotificationCheck = user.NextNotificationAt;
-        return nextNotificationCheck.AddMinutes(5);
+        var nextNotificationCheck = userProfileEntity.NextNotificationAt;
+        return nextNotificationCheck?.AddMinutes(5);
     }
 
     /// <summary>
@@ -62,14 +66,9 @@ public class UserBusiness(
     /// </summary>
     /// <param name="userId">User ID.</param>
     /// <param name="role">Role to assign.</param>
-    public async Task AssignRoleForUser(int userId, Role role)
+    public async Task AssignRoleForUser(string userId, Role role)
     {
-        var newUserRole = new UserRoleEntity
-        {
-            UserId = userId,
-            RoleId = (int)role
-        };
-        await userRoleRepository.CreateUserRole(newUserRole);
+        await userRoleRepository.CreateUserRole(userId, role);
     }
 
     /// <summary>
@@ -77,12 +76,12 @@ public class UserBusiness(
     /// </summary>
     /// <param name="userId">User ID.</param>
     /// <returns>Permissions DTO.</returns>
-    public async Task<PermissionsDto> GetPermissionsForUser(int userId)
+    public async Task<PermissionsDto> GetPermissionsForUser(string userId)
     {
         var trackersForUser = await trackedLocationRepository.GetTrackedLocationsForUser(userId);
         var numOfTrackers = trackersForUser.Count;
-        var user = await userRepository.GetUserById(userId);
-        var maxTrackers = user.UserRole.Role.MaxTrackers;
+        var userRoles = await userRoleRepository.GetUserRoleByUserId(userId);
+        var maxTrackers = userRoles.Max(x => x.MaxTrackers);
         var permissions = new PermissionsDto
         {
             CanCreateTracker = numOfTrackers < maxTrackers
@@ -95,7 +94,7 @@ public class UserBusiness(
     /// </summary>
     /// <param name="userId">User ID.</param>
     /// <returns>Notification check DTO.</returns>
-    public async Task<NotificationCheckDto> DoesUserHaveNotificationsSetUp(int userId)
+    public async Task<NotificationCheckDto> DoesUserHaveNotificationsSetUp(string userId)
     {
         var userNotification =
             await userNotificationRepository.GetUserWithNotificationSettings(userId);
@@ -113,7 +112,7 @@ public class UserBusiness(
     /// </summary>
     /// <param name="userId">User ID.</param>
     /// <returns>User notification settings DTO.</returns>
-    public async Task<UserNotificationSettingsDto> GetAllNotificationsForUser(int userId)
+    public async Task<UserNotificationSettingsDto> GetAllNotificationsForUser(string userId)
     {
         var user = await userNotificationRepository.GetUserWithNotificationSettings(userId);
         var userNotificationSettingsDto = new UserNotificationSettingsDto
@@ -127,13 +126,13 @@ public class UserBusiness(
     }
 
 
-    /// <summary>
-    ///     Checks if the user has the admin role.
-    /// </summary>
-    /// <param name="userId">User ID.</param>
-    /// <returns>True if the user is an admin, otherwise false.</returns>
-    public async Task<bool> IsUserAdmin(int userId)
-    {
-        return await userRepository.IsUserAdmin(userId);
-    }
+    // /// <summary>
+    // ///     Checks if the user has the admin role.
+    // /// </summary>
+    // /// <param name="userId">User ID.</param>
+    // /// <returns>True if the user is an admin, otherwise false.</returns>
+    // public async Task<bool> IsUserAdmin(string userId)
+    // {
+    //     return await userProfileRepository.IsUserAdmin(userId);
+    // }
 }

@@ -4,11 +4,11 @@ namespace GlobalEntryTrackerAPI.Extensions;
 
 public static class ClaimsPrincipalExtension
 {
-    public static int GetUserId(this ClaimsPrincipal claimsPrincipal)
+    public static string GetUserId(this ClaimsPrincipal claimsPrincipal)
     {
-        var userId = claimsPrincipal.FindFirstValue(CustomClaimTypes.InternalId);
+        var userId = claimsPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (userId == null) throw new Exception("No user id found");
-        return int.Parse(userId);
+        return userId;
     }
 
     public static string GetBearerToken(this HttpRequest request)

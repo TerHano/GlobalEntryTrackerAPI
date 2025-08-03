@@ -1,22 +1,23 @@
 using Database.Entities;
 using Database.Entities.NotificationSettings;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Database;
 
 public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbContext> options)
-    : DbContext(options)
+    : IdentityDbContext<UserEntity, RoleEntity, string>(options)
 {
     public DbSet<AppointmentLocationEntity> AppointmentLocations { get; set; }
     public DbSet<UserEntity> Users { get; set; }
+
+    public DbSet<UserProfileEntity> UserProfiles { get; set; }
     public DbSet<RoleEntity> Roles { get; set; }
-    public DbSet<UserRoleEntity> UserRoles { get; set; }
     public DbSet<UserNotificationEntity> UserNotifications { get; set; }
     public DbSet<TrackedLocationForUserEntity> UserTrackedLocations { get; set; }
-    public DbSet<DiscordNotificationSettingsEntity> DiscordNotifications { get; set; }
-    public DbSet<NotificationTypeEntity> NotificationTypes { get; set; }
     public DbSet<DiscordNotificationSettingsEntity> DiscordNotificationSettings { get; set; }
-
+    public DbSet<NotificationTypeEntity> NotificationTypes { get; set; }
     public DbSet<EmailNotificationSettingsEntity> EmailNotificationSettings { get; set; }
 
     public DbSet<UserCustomerEntity> UserCustomers { get; set; }
@@ -27,6 +28,7 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
         modelBuilder.Entity<AppointmentLocationEntity>()
             .HasIndex(e => e.ExternalId).IsUnique();
 
@@ -44,48 +46,23 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
             .WithMany()
             .HasForeignKey(e => e.UserId);
 
-        modelBuilder.Entity<DiscordNotificationSettingsEntity>()
-            .HasOne(d => d.UserNotification)
-            .WithOne(u => u.DiscordNotificationSettings)
-            .HasForeignKey<DiscordNotificationSettingsEntity>(d => d.UserNotificationId)
-            .IsRequired();
-
-
-        modelBuilder.Entity<EmailNotificationSettingsEntity>()
-            .HasOne(d => d.UserNotification)
-            .WithOne(u => u.EmailNotificationSettings)
-            .HasForeignKey<EmailNotificationSettingsEntity>(d => d.UserNotificationId)
-            .IsRequired();
-
-
         modelBuilder.Entity<UserNotificationEntity>()
             .HasOne(e => e.DiscordNotificationSettings)
-            .WithOne(e => e.UserNotification)
-            .HasForeignKey<UserNotificationEntity>(e => e.DiscordNotificationSettingsId);
-
+            .WithOne(e => e.UserNotification);
         modelBuilder.Entity<UserNotificationEntity>()
             .HasOne(e => e.EmailNotificationSettings)
-            .WithOne(e => e.UserNotification)
-            .HasForeignKey<UserNotificationEntity>(e => e.EmailNotificationSettingsId);
+            .WithOne(e => e.UserNotification);
 
-
-        modelBuilder.Entity<UserNotificationEntity>()
-            .HasOne(e => e.EmailNotificationSettings)
-            .WithOne(e => e.UserNotification)
-            .HasForeignKey<UserNotificationEntity>(e => e.EmailNotificationSettingsId);
-
-        modelBuilder.Entity<UserEntity>().Property(u => u.NextNotificationAt)
+        modelBuilder.Entity<UserProfileEntity>().Property(u => u.NextNotificationAt)
             .HasDefaultValue(DateTime.UtcNow);
 
-        modelBuilder.Entity<UserRoleEntity>()
-            .HasOne(e => e.User)
-            .WithOne(e => e.UserRole);
-
-        modelBuilder.Entity<UserRoleEntity>()
-            .HasIndex(e => new { e.UserId, e.RoleId }).IsUnique();
 
         modelBuilder.Entity<UserCustomerEntity>()
-            .HasOne(e => e.User)
-            .WithOne(e => e.UserCustomer);
+            .HasOne(e => e.User);
+
+        modelBuilder.Entity<UserEntity>()
+            .HasMany(u => u.UserRoles)
+            .WithMany(r => r.Users)
+            .UsingEntity<IdentityUserRole<string>>();
     }
 }
