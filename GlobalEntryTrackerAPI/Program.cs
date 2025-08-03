@@ -8,7 +8,6 @@ using Database.Entities;
 using Database.Repositories;
 using GlobalEntryTrackerAPI.Endpoints;
 using GlobalEntryTrackerAPI.Endpoints.Notifications;
-using GlobalEntryTrackerAPI.Enum;
 using GlobalEntryTrackerAPI.Extensions;
 using GlobalEntryTrackerAPI.Middleware;
 using GlobalEntryTrackerAPI.Util;
@@ -195,7 +194,13 @@ builder.Services.AddQuartzServer(options =>
     // when shutting down we want jobs to complete gracefully
     options.WaitForJobsToComplete = true;
 });
-
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.SameSite = SameSiteMode.None;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.Domain = builder.Configuration.GetValue<string>("Auth:Cookie_Domain") ??
+                            throw new Exception("Auth Cookie Domain is missing.");
+});
 builder.Services.AddIdentityApiEndpoints<UserEntity>(op =>
     {
         op.SignIn.RequireConfirmedEmail = false;
