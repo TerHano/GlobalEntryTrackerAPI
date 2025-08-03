@@ -43,11 +43,6 @@ public class IdentityAuthBusiness(
         throw new NotImplementedException();
     }
 
-    public Task<UserDto> ResetPasswordForUser(string userId, ResetPasswordRequest request)
-    {
-        throw new NotImplementedException();
-    }
-
     public async Task UpdateUser(UpdateUserRequest request, string userId)
     {
         var user = await userProfileRepository.GetUserProfileById(userId);
@@ -85,5 +80,10 @@ public class IdentityAuthBusiness(
                 Email = request.Email,
                 Enabled = false
             });
+    }
+
+    public Task<UserDto> ResetPasswordForUser(string userId, ResetPasswordRequest request)
+    {
+        throw new NotImplementedException();
     }
 }
