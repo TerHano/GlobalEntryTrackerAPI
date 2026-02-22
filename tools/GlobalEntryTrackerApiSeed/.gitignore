@@ -1,0 +1,10 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+
+# Ignore all .env files
+**.env
+# Except the base .env
+!.env

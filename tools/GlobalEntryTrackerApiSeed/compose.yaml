@@ -1,0 +1,7 @@
+﻿services:
+  globalentrytrackerapiseed:
+    image: globalentrytrackerapiseed
+    build:
+      context: .
+      dockerfile: GlobalEntryTrackerApiSeed/Dockerfile
+
