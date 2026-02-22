@@ -12,6 +12,7 @@ using Business.Exceptions;
 using Database.Entities;
 using Database.Enums;
 using GlobalEntryTrackerAPI.Models;
+using GlobalEntryTrackerAPI.Models.Requests;
 using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Http.Metadata;
@@ -67,6 +68,7 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
             ([FromBody] CreateUserRequest request, HttpContext context,
                 SignInManager<TUser> signInManager,
                 IAuthBusiness authBusiness,
+                IConfiguration configuration,
                 [FromServices] IServiceProvider sp) =>
             {
                 var userManager = sp.GetRequiredService<UserManager<TUser>>();
@@ -225,6 +227,46 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
                 var finalPattern = ((RouteEndpointBuilder)endpointBuilder).RoutePattern.RawText;
                 confirmEmailEndpointName = $"{nameof(MapEntryAlertIdentityApi)}-{finalPattern}";
                 endpointBuilder.Metadata.Add(new EndpointNameMetadata(confirmEmailEndpointName));
+            });
+
+        routeGroup.MapPost("/verify-email",
+            async Task<IResult> (
+                ConfirmEmailRequest request,
+                [FromServices] IServiceProvider sp) =>
+            {
+                var userManager = sp.GetRequiredService<UserManager<TUser>>();
+                if (await userManager.FindByIdAsync(request.UserId) is not { } user)
+                    // We could respond with a 404 instead of a 401 like Identity UI, but that feels like unnecessary information.
+                    return TypedResults.Unauthorized();
+                string code;
+                try
+                {
+                    code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(request.Code));
+                }
+                catch (FormatException)
+                {
+                    return TypedResults.Unauthorized();
+                }
+
+                IdentityResult result;
+
+                if (string.IsNullOrEmpty(request.ChangedEmail))
+                {
+                    result = await userManager.ConfirmEmailAsync(user, code);
+                }
+                else
+                {
+                    // As with Identity UI, email and user name are one and the same. So when we update the email,
+                    // we need to update the user name.
+                    result = await userManager.ChangeEmailAsync(user, request.ChangedEmail, code);
+
+                    if (result.Succeeded)
+                        result = await userManager.SetUserNameAsync(user, request.ChangedEmail);
+                }
+
+                if (!result.Succeeded) throw new Exception(result.Errors.First().Description);
+
+                return Results.Ok();
             });
 
         routeGroup.MapPost("/resendConfirmationEmail", async Task<Ok>

@@ -101,7 +101,7 @@ builder.Services.AddScoped<JobService>();
 builder.Services.AddScoped<UserRoleService>();
 builder.Services.AddScoped<AppointmentArchiveService>();
 
-builder.Services.AddScoped<SmtpClient>(serviceProvider =>
+builder.Services.AddTransient<SmtpClient>(serviceProvider =>
 {
     var config = serviceProvider.GetRequiredService<IConfiguration>();
     var smtpHost = config.GetValue<string>("Smtp:Host");
@@ -116,9 +116,12 @@ builder.Services.AddScoped<SmtpClient>(serviceProvider =>
         Port = smtpPort ?? throw new Exception("Smtp Port is missing."),
         Credentials =
             new NetworkCredential(smtpUsername ?? throw new Exception("Smtp Username missing"),
-                smtpPassword ?? throw new Exception("Smtp Password missing"))
+                smtpPassword ?? throw new Exception("Smtp Password missing")),
+        Timeout = 10000
     };
 });
+
+builder.Services.AddTransient<IEmailSender<UserEntity>, AwsEmailSender>();
 
 builder.Services.AddHttpClient();
 
@@ -203,7 +206,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 builder.Services.AddIdentityApiEndpoints<UserEntity>(op =>
     {
-        op.SignIn.RequireConfirmedEmail = false;
+        op.SignIn.RequireConfirmedEmail = true;
     })
     .AddRoles<RoleEntity>()
     .AddEntityFrameworkStores<GlobalEntryTrackerDbContext>()
