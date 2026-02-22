@@ -206,7 +206,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 builder.Services.AddIdentityApiEndpoints<UserEntity>(op =>
     {
-        op.SignIn.RequireConfirmedEmail = true;
+        op.SignIn.RequireConfirmedEmail = false;
     })
     .AddRoles<RoleEntity>()
     .AddEntityFrameworkStores<GlobalEntryTrackerDbContext>()

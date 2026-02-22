@@ -15,7 +15,6 @@ namespace Business;
 public class UserAppointmentTrackerBusiness(
     TrackedLocationForUserRepository trackedLocationForUserRepository,
     UserRoleRepository userRoleRepository,
-    UserProfileRepository userProfileRepository,
     JobService jobService,
     IMapper mapper,
     ILogger<UserAppointmentTrackerBusiness> logger)
@@ -113,8 +112,17 @@ public class UserAppointmentTrackerBusiness(
                 userId, request.LocationId, request.NotificationTypeId, request.Id))
             throw new TrackerForLocationAndTypeExistsException(
                 "You already have a tracker for this location and notification type.");
-        var entity = mapper.Map(request, trackedLocation);
-        entity.UpdatedAt = DateTime.UtcNow;
+
+        // Map incoming values onto the fetched entity to preserve entity tracking by EF.
+        mapper.Map(request, trackedLocation);
+
+        // Explicitly set the FK and clear the navigation property so EF updates the relationship.
+        trackedLocation.LocationId = request.LocationId;
+        trackedLocation.NotificationTypeId = request.NotificationTypeId;
+        // Clear the navigation property to force EF to re-load/associate the new Location if needed
+        trackedLocation.Location = null!;
+
+        trackedLocation.UpdatedAt = DateTime.UtcNow;
         try
         {
             await jobService.StartTrackingAppointmentLocation(request.LocationId);
@@ -126,7 +134,7 @@ public class UserAppointmentTrackerBusiness(
                 "Error updating tracker, please try again later");
         }
 
-        return await trackedLocationForUserRepository.UpdateTrackerForUser(entity);
+        return await trackedLocationForUserRepository.UpdateTrackerForUser(trackedLocation);
     }
 
     /// <summary>
