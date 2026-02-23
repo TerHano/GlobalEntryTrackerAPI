@@ -79,7 +79,16 @@ public class UserProfileRepository(
         try
         {
             await using var context = await contextFactory.CreateDbContextAsync();
-            foreach (var user in users) context.UserProfiles.Update(user);
+            foreach (var user in users)
+            {
+                if (user is null) throw new NullReferenceException("User does not exist");
+                // Attach the entity and mark only the properties we want to update
+                var entry = context.UserProfiles.Attach(user);
+                entry.Property(x => x.Email).IsModified = true;
+                entry.Property(x => x.FirstName).IsModified = true;
+                entry.Property(x => x.LastName).IsModified = true;
+            }
+
             await context.SaveChangesAsync();
         }
         catch (DbUpdateException ex)
@@ -94,7 +103,7 @@ public class UserProfileRepository(
         try
         {
             await using var context = await contextFactory.CreateDbContextAsync();
-            var user = await context.UserProfiles.FindAsync(userId);
+            var user = await context.UserProfiles.FirstOrDefaultAsync(x => x.UserId == userId);
             if (user is null) throw new NullReferenceException("User does not exist");
             context.UserProfiles.Remove(user);
             await context.SaveChangesAsync();
@@ -106,11 +115,6 @@ public class UserProfileRepository(
         }
     }
 
-    /// <summary>
-    ///     Checks if the user has the admin role.
-    /// </summary>
-    /// <param name="userId">User ID.</param>
-    /// <returns>True if the user is an admin, otherwise false.</returns>
     // public async Task<bool> IsUserAdmin(string userId)
     // {
     //     await using var context = await contextFactory.CreateDbContextAsync();
@@ -121,7 +125,12 @@ public class UserProfileRepository(
     //     return user?.UserRoles?.Role.Code == Role.Admin.GetCode();
     // }
 
-    //get users for admin
+    /// <summary>
+    ///     Gets all user profiles for admin view.
+    /// </summary>
+    /// <param name="userId">User ID.</param>
+    /// <param name="includeSelf">Whether to include the current user in the results.</param>
+    /// <returns>List of user entities.</returns>
     public async Task<List<UserEntity>> GetAllUserProfilesForAdmin(string userId,
         bool includeSelf = false)
     {

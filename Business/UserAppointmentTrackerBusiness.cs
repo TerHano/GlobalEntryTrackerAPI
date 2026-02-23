@@ -113,16 +113,10 @@ public class UserAppointmentTrackerBusiness(
             throw new TrackerForLocationAndTypeExistsException(
                 "You already have a tracker for this location and notification type.");
 
-        // Map incoming values onto the fetched entity to preserve entity tracking by EF.
+        // Map incoming values onto the fetched entity
         mapper.Map(request, trackedLocation);
-
-        // Explicitly set the FK and clear the navigation property so EF updates the relationship.
-        trackedLocation.LocationId = request.LocationId;
-        trackedLocation.NotificationTypeId = request.NotificationTypeId;
-        // Clear the navigation property to force EF to re-load/associate the new Location if needed
-        trackedLocation.Location = null!;
-
         trackedLocation.UpdatedAt = DateTime.UtcNow;
+
         try
         {
             await jobService.StartTrackingAppointmentLocation(request.LocationId);

@@ -256,7 +256,7 @@ public class SubscriptionBusiness(
                     await userCustomerRepository.AddEditUserCustomer(userCustomer);
 
                     //Move up users next notification date
-                    var user = await userProfileRepository.GetUserProfileById(userId);
+                    var user = await userProfileRepository.GetUserProfileById(userId, true);
                     if (user == null)
                     {
                         logger.LogError("User not found");

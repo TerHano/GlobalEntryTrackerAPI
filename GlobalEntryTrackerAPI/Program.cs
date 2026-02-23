@@ -199,10 +199,21 @@ builder.Services.AddQuartzServer(options =>
 });
 builder.Services.ConfigureApplicationCookie(options =>
 {
-    options.Cookie.SameSite = SameSiteMode.None;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-    options.Cookie.Domain = builder.Configuration.GetValue<string>("Auth:Cookie_Domain") ??
-                            throw new Exception("Auth Cookie Domain is missing.");
+    var cookieDomain = builder.Configuration.GetValue<string>("Auth:Cookie_Domain");
+    var isLocalhostCookieDomain = string.IsNullOrWhiteSpace(cookieDomain) ||
+                                  cookieDomain.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                                  cookieDomain.Equals("127.0.0.1") ||
+                                  cookieDomain.Equals("::1");
+
+    if (!isLocalhostCookieDomain)
+    {
+        options.Cookie.Domain = cookieDomain;
+    }
+
+    options.Cookie.SameSite = isLocalhostCookieDomain ? SameSiteMode.Lax : SameSiteMode.None;
+    options.Cookie.SecurePolicy = isLocalhostCookieDomain
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always;
 });
 builder.Services.AddIdentityApiEndpoints<UserEntity>(op =>
     {

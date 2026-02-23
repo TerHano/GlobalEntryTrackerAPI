@@ -9,8 +9,10 @@ public class UserRoleService
     {
         var userRole = userProfileEntity.User.UserRoles?.FirstOrDefault();
         var roleInfo = roles.Find(x => x.Id == userRole?.Id);
+
         if (roleInfo == null)
-            throw new Exception($"Role {userRole?.Id} doesn't exist");
+            throw new InvalidOperationException(
+                $"Role with ID '{userRole?.Id}' does not exist in the system");
         userProfileEntity.User.UserProfile.NextNotificationAt =
             DateTime.UtcNow.AddMinutes(roleInfo.NotificationIntervalInMinutes);
     }
