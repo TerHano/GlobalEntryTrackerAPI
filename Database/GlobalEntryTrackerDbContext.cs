@@ -26,6 +26,8 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
 
     public DbSet<ArchivedAppointmentEntity> ArchivedAppointments { get; set; }
 
+    public DbSet<StripeWebhookEventEntity> StripeWebhookEvents { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -59,6 +61,13 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
 
         modelBuilder.Entity<UserCustomerEntity>()
             .HasOne(e => e.User);
+
+        modelBuilder.Entity<StripeWebhookEventEntity>()
+            .HasIndex(e => e.EventId)
+            .IsUnique();
+
+        modelBuilder.Entity<StripeWebhookEventEntity>()
+            .HasIndex(e => e.IsProcessed);
 
         modelBuilder.Entity<UserEntity>()
             .HasMany(u => u.UserRoles)

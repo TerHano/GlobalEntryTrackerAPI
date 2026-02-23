@@ -73,6 +73,7 @@ builder.Services.AddScoped<NotificationTypeRepository>();
 builder.Services.AddScoped<UserProfileRepository>();
 builder.Services.AddScoped<UserRoleRepository>();
 builder.Services.AddScoped<UserCustomerRepository>();
+builder.Services.AddScoped<StripeWebhookEventRepository>();
 builder.Services.AddScoped<PlanOptionRepository>();
 builder.Services.AddScoped<UserNotificationRepository>();
 builder.Services.AddScoped<ArchivedAppointmentsRepository>();
