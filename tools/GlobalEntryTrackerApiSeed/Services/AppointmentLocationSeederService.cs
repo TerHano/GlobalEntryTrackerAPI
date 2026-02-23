@@ -15,31 +15,60 @@ public class AppointmentLocationSeederService(
     private const string ApiUrl =
         "https://ttp.cbp.dhs.gov/schedulerapi/locations/?temporary=false&inviteOnly=false&operational=true&serviceName=Global%20Entry";
 
-    public async Task<int> SeedLocationsAsync(CancellationToken cancellationToken = default)
+    public async Task<LocationSeedResult> SeedLocationsAsync(CancellationToken cancellationToken = default)
+    {
+        return await SeedLocationsAsync(false, cancellationToken);
+    }
+
+    public async Task<LocationSeedResult> SeedLocationsAsync(bool dryRun,
+        CancellationToken cancellationToken = default)
     {
         try
         {
-            logger.LogInformation("Starting appointment location seeding process");
+            logger.LogInformation("Starting appointment location seeding process{Mode}",
+                dryRun ? " (dry-run)" : string.Empty);
 
             var locations = await FetchLocationsFromApiAsync(cancellationToken);
             if (locations == null || locations.Count == 0)
             {
                 logger.LogWarning("No appointment locations returned from API");
-                return 1;
+                return new LocationSeedResult
+                {
+                    Success = false,
+                    DryRun = dryRun,
+                    Error = "No appointment locations returned from API"
+                };
             }
 
             logger.LogInformation("Fetched {Count} locations from API", locations.Count);
 
             var entities = TransformLocations(locations);
-            var (created, updated) = await SaveLocationsToDatabase(entities, cancellationToken);
+            var (created, updated) = await SaveLocationsToDatabase(entities, dryRun, cancellationToken);
 
-            logger.LogInformation("Seeding completed. Created: {Created}, Updated: {Updated}", created, updated);
-            return 0;
+            logger.LogInformation(
+                "Seeding completed. Created: {Created}, Updated: {Updated}{DryRunSuffix}",
+                created,
+                updated,
+                dryRun ? " (no database changes were persisted)" : string.Empty);
+            return new LocationSeedResult
+            {
+                Success = true,
+                DryRun = dryRun,
+                FetchedFromApi = locations.Count,
+                ValidForDatabase = entities.Count,
+                Created = created,
+                Updated = updated
+            };
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "An error occurred during seeding");
-            return 1;
+            return new LocationSeedResult
+            {
+                Success = false,
+                DryRun = dryRun,
+                Error = ex.Message
+            };
         }
     }
 
@@ -81,6 +110,7 @@ public class AppointmentLocationSeederService(
 
     private async Task<(int created, int updated)> SaveLocationsToDatabase(
         List<AppointmentLocationEntity> entities,
+        bool dryRun,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
@@ -112,7 +142,11 @@ public class AppointmentLocationSeederService(
             }
         }
 
-        await context.SaveChangesAsync(cancellationToken);
+        if (!dryRun)
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+
         return (createdCount, updatedCount);
     }
 

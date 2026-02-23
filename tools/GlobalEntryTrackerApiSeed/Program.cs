@@ -1,4 +1,6 @@
-﻿using Database;
+﻿using System.Text.Json;
+using Database;
+using GlobalEntryTrackerApiSeed.Models;
 using GlobalEntryTrackerApiSeed.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -26,21 +28,111 @@ builder.Services.AddDbContextFactory<GlobalEntryTrackerDbContext>(options =>
 // Services
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<AppointmentLocationSeederService>();
+builder.Services.AddSingleton<StripeCatalogSeederService>();
+builder.Services.AddSingleton<StripeSubscriberBackfillService>();
 
 var host = builder.Build();
 
-// Run the seeder
-var seederService = host.Services.GetRequiredService<AppointmentLocationSeederService>();
-var exitCode = await seederService.SeedLocationsAsync();
+var runLocationSeed = args.Length == 0 ||
+                      args.Contains("--seed-locations", StringComparer.OrdinalIgnoreCase);
+var runStripeCatalogSeed =
+    args.Contains("--seed-stripe-catalog", StringComparer.OrdinalIgnoreCase);
+var runStripeSubscriberBackfill =
+    args.Contains("--backfill-stripe-subscribers", StringComparer.OrdinalIgnoreCase);
+var dryRunFromArgs = args.Contains("--dry-run", StringComparer.OrdinalIgnoreCase);
+var dryRun = dryRunFromArgs || ParseBool(
+    builder.Configuration["DRY_RUN"] ?? Environment.GetEnvironmentVariable("DRY_RUN"),
+    false);
+
+if (!runLocationSeed && !runStripeCatalogSeed && !runStripeSubscriberBackfill)
+{
+    var logger = host.Services.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Program");
+    logger.LogError(
+        "No valid mode was provided. Use --seed-locations, --seed-stripe-catalog, and/or --backfill-stripe-subscribers.");
+    return 1;
+}
+
+var exitCode = 0;
+LocationSeedResult? locationSeedResult = null;
+StripeCatalogSeedResult? stripeCatalogSeedResult = null;
+StripeSubscriberBackfillResult? stripeSubscriberBackfillResult = null;
+
+if (runLocationSeed)
+{
+    var locationSeederService = host.Services
+        .GetRequiredService<AppointmentLocationSeederService>();
+    locationSeedResult = await locationSeederService.SeedLocationsAsync(dryRun);
+    if (!locationSeedResult.Success)
+    {
+        exitCode = 1;
+    }
+}
+
+if (runStripeCatalogSeed)
+{
+    var stripeCatalogSeederService = host.Services
+        .GetRequiredService<StripeCatalogSeederService>();
+    var stripeOptions = GetStripeCatalogSeedOptions(builder.Configuration, dryRun);
+    stripeCatalogSeedResult = await stripeCatalogSeederService.SeedStripeCatalogAsync(
+        stripeOptions);
+    if (!stripeCatalogSeedResult.Success)
+    {
+        exitCode = 1;
+    }
+}
+
+if (runStripeSubscriberBackfill)
+{
+    var stripeSubscriberBackfillService = host.Services
+        .GetRequiredService<StripeSubscriberBackfillService>();
+    var backfillOptions = GetStripeSubscriberBackfillOptions(builder.Configuration, dryRun);
+    stripeSubscriberBackfillResult = await stripeSubscriberBackfillService.BackfillSubscribersAsync(
+        backfillOptions);
+    if (!stripeSubscriberBackfillResult.Success)
+    {
+        exitCode = 1;
+    }
+}
+
+if (dryRun)
+{
+    var reportOptions = GetReportOutputOptions(builder.Configuration);
+    var report = new SeedReport
+    {
+        GeneratedAtUtc = DateTime.UtcNow,
+        DryRun = true,
+        LocationSeed = locationSeedResult,
+        StripeCatalogSeed = stripeCatalogSeedResult,
+        StripeSubscriberBackfill = stripeSubscriberBackfillResult
+    };
+
+    var logger = host.Services.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Program");
+    var reportJson = JsonSerializer.Serialize(report,
+        new JsonSerializerOptions
+        {
+            WriteIndented = true
+        });
+    var reportFullPath = Path.GetFullPath(reportOptions.ReportPath);
+    var reportDirectory = Path.GetDirectoryName(reportFullPath);
+    if (!string.IsNullOrWhiteSpace(reportDirectory))
+    {
+        Directory.CreateDirectory(reportDirectory);
+    }
+
+    await File.WriteAllTextAsync(reportFullPath, reportJson);
+    logger.LogInformation("Dry-run report written to {ReportPath}", reportFullPath);
+}
 
 return exitCode;
 
 static string GetConnectionString(IConfiguration configuration)
 {
     // Prefer a full connection string if provided (useful for Docker/production)
-    var envConnectionString = configuration["CONNECTION_STRING"] ?? 
+    var envConnectionString = configuration["CONNECTION_STRING"] ??
                              Environment.GetEnvironmentVariable("CONNECTION_STRING");
-    
+
     if (!string.IsNullOrWhiteSpace(envConnectionString))
     {
         return envConnectionString;
@@ -67,4 +159,92 @@ static string GetConnectionString(IConfiguration configuration)
     }
 
     return $"Host={dbHost};Port={dbPort};Username={dbUser};Password={dbPassword};Database={dbName};Include Error Detail=true";
+}
+
+static StripeCatalogSeedOptions GetStripeCatalogSeedOptions(
+    IConfiguration configuration,
+    bool dryRun)
+{
+    var stripeSecretKey =
+        configuration["STRIPE_SECRET_KEY"] ?? Environment.GetEnvironmentVariable(
+            "STRIPE_SECRET_KEY");
+    var stripeProductIds = ParseCsvSet(
+        configuration["STRIPE_PRODUCT_IDS"] ?? Environment.GetEnvironmentVariable(
+            "STRIPE_PRODUCT_IDS"));
+    var stripePriceIds = ParseCsvSet(
+        configuration["STRIPE_PRICE_IDS"] ?? Environment.GetEnvironmentVariable(
+            "STRIPE_PRICE_IDS"));
+    var onlyActive = ParseBool(
+        configuration["STRIPE_ONLY_ACTIVE"] ?? Environment.GetEnvironmentVariable(
+            "STRIPE_ONLY_ACTIVE"),
+        true);
+
+    return new StripeCatalogSeedOptions
+    {
+        StripeSecretKey = stripeSecretKey,
+        ProductIds = stripeProductIds,
+        PriceIds = stripePriceIds,
+        OnlyActive = onlyActive,
+        DryRun = dryRun
+    };
+}
+
+static HashSet<string> ParseCsvSet(string? value)
+{
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        return [];
+    }
+
+    var parsedValues = value
+        .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    return parsedValues;
+}
+
+static bool ParseBool(string? value, bool defaultValue)
+{
+    return bool.TryParse(value, out var parsed) ? parsed : defaultValue;
+}
+
+static StripeSubscriberBackfillOptions GetStripeSubscriberBackfillOptions(
+    IConfiguration configuration,
+    bool dryRun)
+{
+    var stripeSecretKey =
+        configuration["STRIPE_SECRET_KEY"] ?? Environment.GetEnvironmentVariable(
+            "STRIPE_SECRET_KEY");
+    var statuses = ParseCsvSet(
+        configuration["STRIPE_BACKFILL_STATUSES"] ?? Environment.GetEnvironmentVariable(
+            "STRIPE_BACKFILL_STATUSES"));
+    if (statuses.Count == 0)
+    {
+        statuses = ["active", "trialing"];
+    }
+
+    var matchByEmail = ParseBool(
+        configuration["STRIPE_BACKFILL_MATCH_EMAIL"] ?? Environment.GetEnvironmentVariable(
+            "STRIPE_BACKFILL_MATCH_EMAIL"),
+        true);
+    return new StripeSubscriberBackfillOptions
+    {
+        StripeSecretKey = stripeSecretKey,
+        SubscriptionStatuses = statuses,
+        MatchByEmail = matchByEmail,
+        DryRun = dryRun
+    };
+}
+
+static ReportOutputOptions GetReportOutputOptions(IConfiguration configuration)
+{
+    var reportPath = configuration["REPORT_PATH"] ?? Environment.GetEnvironmentVariable("REPORT_PATH");
+    if (string.IsNullOrWhiteSpace(reportPath))
+    {
+        reportPath = "seed-report.json";
+    }
+
+    return new ReportOutputOptions
+    {
+        ReportPath = reportPath
+    };
 }
