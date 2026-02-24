@@ -57,8 +57,34 @@ public class UserBusiness(
         if (activeTrackersForUser.Count == 0 ||
             activeTrackersForUser.All(x => x.Enabled == false))
             return null;
+        var userNotification =
+            await userNotificationRepository.GetUserWithNotificationSettings(userId);
+        var isAnyNotificationsEnabled =
+            userNotification?.EmailNotificationSettings?.Enabled == true ||
+            userNotification?.DiscordNotificationSettings?.Enabled == true;
+        if (!isAnyNotificationsEnabled)
+            return null;
         var nextNotificationCheck = userProfileEntity.NextNotificationAt;
-        return nextNotificationCheck?.AddMinutes(5);
+        // If the stored value is still in the future, it's a valid cooldown — use it.
+        if (nextNotificationCheck.HasValue && nextNotificationCheck.Value > DateTime.UtcNow)
+            return nextNotificationCheck.Value.AddMinutes(5);
+        // The stored value is stale (past or null). Fall back to the Quartz scheduler's
+        // next fire time for the user's active location jobs.
+        var scheduler = await schedulerFactory.GetScheduler();
+        var activeLocationIds = activeTrackersForUser
+            .Where(x => x.Enabled)
+            .Select(x => x.LocationId)
+            .Distinct();
+        DateTimeOffset? earliestNextFire = null;
+        foreach (var locationId in activeLocationIds)
+        {
+            var triggerKey = new TriggerKey("EveryConfiguredMin", $"Trigger-{locationId}");
+            var trigger = await scheduler.GetTrigger(triggerKey);
+            var nextFire = trigger?.GetNextFireTimeUtc();
+            if (nextFire.HasValue && (earliestNextFire == null || nextFire < earliestNextFire))
+                earliestNextFire = nextFire;
+        }
+        return earliestNextFire?.UtcDateTime;
     }
 
     /// <summary>
