@@ -19,6 +19,7 @@ public class TrackedLocationForUserRepository(
     {
         await using var context = await contextFactory.CreateDbContextAsync();
         var trackedLocation = await context.UserTrackedLocations
+            .AsNoTracking()
             .Include(x => x.Location)
             .Include(x => x.NotificationType)
             .FirstOrDefaultAsync(x => x.Id == trackerId);

@@ -10,6 +10,7 @@ services:
     - "dotnet"
     - "/app/bin/Debug/net9.0/GlobalEntryTrackerAPI.dll"
     environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
       DOTNET_USE_POLLING_FILE_WATCHER: "true"
     image: "globalentrytrackerapi:dev"
     ports: []

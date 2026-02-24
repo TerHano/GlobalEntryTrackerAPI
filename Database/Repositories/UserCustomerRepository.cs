@@ -40,4 +40,19 @@ public class UserCustomerRepository(
             throw new DbUpdateException("Failed to add/edit user customer", ex);
         }
     }
+
+    public async Task<UserCustomerEntity?> GetCustomerDetailsForCustomerId(string customerId)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        var userCustomer = await context.UserCustomers.FirstOrDefaultAsync(x => x.CustomerId == customerId);
+        return userCustomer;
+    }
+
+    public async Task<UserCustomerEntity?> GetCustomerDetailsForSubscriptionId(string subscriptionId)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        var userCustomer = await context.UserCustomers
+            .FirstOrDefaultAsync(x => x.SubscriptionId == subscriptionId);
+        return userCustomer;
+    }
 }

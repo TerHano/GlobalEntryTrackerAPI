@@ -17,8 +17,10 @@ namespace Business;
 /// </summary>
 public class SubscriptionBusiness(
     UserCustomerRepository userCustomerRepository,
+    StripeWebhookEventRepository stripeWebhookEventRepository,
     UserRoleRepository userRoleRepository,
     UserProfileRepository userProfileRepository,
+    PlanOptionRepository planOptionRepository,
     RoleManager<RoleEntity> roleManager,
     UserRoleService userRoleService,
     IConfiguration configuration,
@@ -33,14 +35,25 @@ public class SubscriptionBusiness(
     public async Task<string> GetSubscriptionPaymentUrl(string userId,
         CreateCheckoutSessionRequest request)
     {
-        if (request.PriceId == null) throw new Exception("Price Id is required");
+        if (string.IsNullOrWhiteSpace(request.PriceId)) throw new Exception("Price Id is required");
+        if (!IsAllowedRedirectUrl(request.SuccessUrl) || !IsAllowedRedirectUrl(request.CancelUrl))
+            throw new Exception("Invalid checkout redirect URL.");
+
+        var availablePlans = await planOptionRepository.GetAllPlanOptions();
+        var selectedPlan = availablePlans.FirstOrDefault(x =>
+            x.PriceId.Equals(request.PriceId, StringComparison.Ordinal));
+        if (selectedPlan == null)
+            throw new Exception("Requested price is not available.");
+
+        var existingUserCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
+
         var options = new SessionCreateOptions
         {
             LineItems =
             [
                 new SessionLineItemOptions
                 {
-                    Price = request.PriceId,
+                    Price = selectedPlan.PriceId,
                     Quantity = 1
                 }
             ],
@@ -49,6 +62,12 @@ public class SubscriptionBusiness(
             AllowPromotionCodes = true,
             SuccessUrl = request.SuccessUrl,
             CancelUrl = request.CancelUrl,
+            Customer = existingUserCustomer?.CustomerId,
+            ClientReferenceId = userId,
+            Metadata = new Dictionary<string, string>
+            {
+                { "userId", userId }
+            },
             SubscriptionData = new SessionSubscriptionDataOptions
             {
                 Metadata = new Dictionary<string, string>
@@ -71,6 +90,9 @@ public class SubscriptionBusiness(
     public async Task<string> GetSubscriptionManagementUrl(string userId,
         ManageSubscriptionSessionRequest request)
     {
+        if (!IsAllowedRedirectUrl(request.ReturnUrl))
+            throw new Exception("Invalid management return URL.");
+
         var userCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
         if (userCustomer == null)
             throw new NullReferenceException("User customer not found");
@@ -220,82 +242,297 @@ public class SubscriptionBusiness(
         string jsonBody)
     {
         var stripeWebhookSecret =
-            configuration["Stripe:Webhook_Secret"] ?? null;
+            configuration["Stripe:Webhook_Secret"];
+
+        if (string.IsNullOrWhiteSpace(stripeWebhookSecret))
+            throw new ApplicationException("Stripe webhook secret is missing.");
+
+        string? stripeEventId = null;
 
         //Get request body
         try
         {
             var stripeEvent =
                 EventUtility.ConstructEvent(jsonBody, stripeSignature, stripeWebhookSecret);
+
+            stripeEventId = stripeEvent.Id;
+            if (string.IsNullOrWhiteSpace(stripeEventId))
+                throw new ApplicationException("Stripe webhook event id is missing.");
+
+            var isNewEvent = await stripeWebhookEventRepository.TryStartProcessing(
+                stripeEventId,
+                stripeEvent.Type);
+            if (!isNewEvent)
+            {
+                logger.LogInformation(
+                    "Duplicate Stripe webhook event ignored: {StripeEventId} ({StripeEventType})",
+                    stripeEventId,
+                    stripeEvent.Type);
+                return;
+            }
+
             switch (stripeEvent.Type)
             {
                 case EventTypes.CustomerSubscriptionCreated:
-                {
-                    if (stripeEvent.Data.Object is not Subscription subscriptionEvent)
                     {
-                        logger.LogError("Subscription event is null");
-                        throw new NullReferenceException("Subscription event is null");
+                        if (stripeEvent.Data.Object is not Subscription subscriptionEvent)
+                        {
+                            logger.LogError("Subscription event is null");
+                            throw new NullReferenceException("Subscription event is null");
+                        }
+
+                        var userId = await ResolveUserId(subscriptionEvent);
+                        if (string.IsNullOrWhiteSpace(userId))
+                        {
+                            logger.LogWarning("UserId not found while processing subscription created event");
+                            break;
+                        }
+
+
+                        var userCustomer = new UserCustomerEntity
+                        {
+                            UserId = userId,
+                            SubscriptionId = subscriptionEvent.Id,
+                            CustomerId = subscriptionEvent.CustomerId
+                        };
+                        await userCustomerRepository.AddEditUserCustomer(userCustomer);
+                        await ActivateSubscriptionForUser(userId);
+
+                        break;
                     }
-
-                    var userId = subscriptionEvent.Metadata["userId"];
-                    if (userId == null)
+                case EventTypes.CustomerSubscriptionUpdated:
                     {
-                        logger.LogError("UserId not found in subscription metadata");
-                        throw new NullReferenceException(
-                            "UserId not found in subscription metadata");
+                        if (stripeEvent.Data.Object is not Subscription subscriptionEvent)
+                        {
+                            logger.LogError("Subscription event is null");
+                            throw new NullReferenceException("Subscription event is null");
+                        }
+
+                        var userId = await ResolveUserId(subscriptionEvent);
+                        if (string.IsNullOrWhiteSpace(userId))
+                        {
+                            logger.LogWarning("UserId not found while processing subscription updated event");
+                            break;
+                        }
+
+                        await userCustomerRepository.AddEditUserCustomer(new UserCustomerEntity
+                        {
+                            UserId = userId,
+                            SubscriptionId = subscriptionEvent.Id,
+                            CustomerId = subscriptionEvent.CustomerId
+                        });
+
+                        if (IsSubscriptionActive(subscriptionEvent.Status))
+                        {
+                            await ActivateSubscriptionForUser(userId);
+                        }
+                        else
+                        {
+                            await userRoleRepository.RemoveRoleForUser(userId, Role.Subscriber);
+                        }
+
+                        break;
                     }
-
-
-                    var userCustomer = new UserCustomerEntity
+                case EventTypes.CheckoutSessionCompleted:
                     {
-                        UserId = userId,
-                        SubscriptionId = subscriptionEvent.Id,
-                        CustomerId = subscriptionEvent.CustomerId
-                    };
-                    await userRoleRepository.AddEditRoleForUser(userId, Role.Subscriber);
-                    await userCustomerRepository.AddEditUserCustomer(userCustomer);
+                        if (stripeEvent.Data.Object is not Session checkoutSession)
+                        {
+                            logger.LogError("Checkout session event is null");
+                            throw new NullReferenceException("Checkout session event is null");
+                        }
 
-                    //Move up users next notification date
-                    var user = await userProfileRepository.GetUserProfileById(userId);
-                    if (user == null)
-                    {
-                        logger.LogError("User not found");
-                        throw new NullReferenceException("User not found");
+                        var userId = ResolveUserId(checkoutSession);
+                        if (string.IsNullOrWhiteSpace(userId))
+                        {
+                            logger.LogWarning("UserId not found while processing checkout.session.completed event");
+                            break;
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(checkoutSession.CustomerId) &&
+                            !string.IsNullOrWhiteSpace(checkoutSession.SubscriptionId))
+                        {
+                            await userCustomerRepository.AddEditUserCustomer(new UserCustomerEntity
+                            {
+                                UserId = userId,
+                                CustomerId = checkoutSession.CustomerId,
+                                SubscriptionId = checkoutSession.SubscriptionId
+                            });
+                        }
+
+                        if (checkoutSession.PaymentStatus == "paid")
+                        {
+                            await ActivateSubscriptionForUser(userId);
+                        }
+
+                        break;
                     }
+                case EventTypes.InvoicePaid:
+                    {
+                        if (stripeEvent.Data.Object is not Invoice invoice)
+                        {
+                            logger.LogError("Invoice event is null");
+                            throw new NullReferenceException("Invoice event is null");
+                        }
 
-                    var roles = roleManager.Roles.ToList();
-                    userRoleService.UpdateNextNotificationTimeForUser(user, roles);
-                    await userProfileRepository.UpdateUserProfile(user);
-                    break;
-                }
+                        if (string.IsNullOrWhiteSpace(invoice.CustomerId))
+                        {
+                            logger.LogWarning("Invoice paid event does not include a customer id");
+                            break;
+                        }
+
+                        var userCustomer =
+                            await userCustomerRepository.GetCustomerDetailsForCustomerId(invoice.CustomerId);
+                        if (userCustomer == null)
+                        {
+                            logger.LogWarning("User customer mapping not found for invoice paid event");
+                            break;
+                        }
+
+                        await ActivateSubscriptionForUser(userCustomer.UserId);
+                        break;
+                    }
+                case EventTypes.InvoicePaymentFailed:
+                    {
+                        if (stripeEvent.Data.Object is not Invoice invoice)
+                        {
+                            logger.LogError("Invoice event is null");
+                            throw new NullReferenceException("Invoice event is null");
+                        }
+
+                        logger.LogWarning("Invoice payment failed for customer {CustomerId}",
+                            invoice.CustomerId);
+                        break;
+                    }
                 case EventTypes.CustomerSubscriptionDeleted:
-                {
-                    if (stripeEvent.Data.Object is not Subscription subscriptionEvent)
                     {
-                        logger.LogError("Subscription event is null");
-                        throw new NullReferenceException("Subscription event is null");
-                    }
+                        if (stripeEvent.Data.Object is not Subscription subscriptionEvent)
+                        {
+                            logger.LogError("Subscription event is null");
+                            throw new NullReferenceException("Subscription event is null");
+                        }
 
-                    var userId = subscriptionEvent.Metadata["userId"];
-                    if (userId == null)
+                        var userId = await ResolveUserId(subscriptionEvent);
+                        if (string.IsNullOrWhiteSpace(userId))
+                        {
+                            logger.LogWarning("UserId not found while processing subscription deleted event");
+                            break;
+                        }
+
+                        await userRoleRepository.RemoveRoleForUser(userId, Role.Subscriber);
+                        break;
+                    }
+                default:
                     {
-                        logger.LogError("UserId not found in subscription metadata");
-                        throw new NullReferenceException(
-                            "UserId not found in subscription metadata");
+                        logger.LogInformation("Unhandled Stripe event type {StripeEventType}",
+                            stripeEvent.Type);
+                        break;
                     }
-
-                    var userIdInt = int.Parse(userId);
-                    await userRoleRepository.RemoveRoleForUser(userId, Role.Subscriber);
-                    break;
-                }
             }
+
+            await stripeWebhookEventRepository.MarkProcessed(stripeEventId);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex.Message);
+            if (!string.IsNullOrWhiteSpace(stripeEventId))
+            {
+                try
+                {
+                    await stripeWebhookEventRepository.ReleaseProcessingLock(stripeEventId);
+                }
+                catch (Exception lockReleaseException)
+                {
+                    logger.LogWarning(lockReleaseException,
+                        "Failed to release Stripe webhook processing lock for event {StripeEventId}",
+                        stripeEventId);
+                }
+            }
+
+            logger.LogError(ex, "Error processing Stripe webhook event");
             throw new ApplicationException(
                 "Error processing subscription event, please try again later");
         }
+    }
+
+    private async Task ActivateSubscriptionForUser(string userId)
+    {
+        await userRoleRepository.AddEditRoleForUser(userId, Role.Subscriber);
+
+        var user = await userProfileRepository.GetUserProfileById(userId, true);
+        if (user == null)
+        {
+            logger.LogWarning("User profile not found for user id {UserId}", userId);
+            return;
+        }
+
+        var roles = roleManager.Roles.ToList();
+        userRoleService.UpdateNextNotificationTimeForUser(user, roles);
+        await userProfileRepository.UpdateUserProfile(user);
+    }
+
+    private async Task<string?> ResolveUserId(Subscription subscription)
+    {
+        if (subscription.Metadata != null &&
+            subscription.Metadata.TryGetValue("userId", out var metadataUserId) &&
+            !string.IsNullOrWhiteSpace(metadataUserId))
+            return metadataUserId;
+
+        if (!string.IsNullOrWhiteSpace(subscription.CustomerId))
+        {
+            var existingUserCustomer =
+                await userCustomerRepository.GetCustomerDetailsForCustomerId(subscription.CustomerId);
+            if (existingUserCustomer != null)
+                return existingUserCustomer.UserId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(subscription.Id))
+        {
+            var existingUserCustomer =
+                await userCustomerRepository.GetCustomerDetailsForSubscriptionId(subscription.Id);
+            if (existingUserCustomer != null)
+                return existingUserCustomer.UserId;
+        }
+
+        return null;
+    }
+
+    private static string? ResolveUserId(Session checkoutSession)
+    {
+        if (checkoutSession.Metadata != null &&
+            checkoutSession.Metadata.TryGetValue("userId", out var metadataUserId) &&
+            !string.IsNullOrWhiteSpace(metadataUserId))
+            return metadataUserId;
+
+        return string.IsNullOrWhiteSpace(checkoutSession.ClientReferenceId)
+            ? null
+            : checkoutSession.ClientReferenceId;
+    }
+
+    private static bool IsSubscriptionActive(string subscriptionStatus)
+    {
+        return subscriptionStatus.Equals("active", StringComparison.OrdinalIgnoreCase) ||
+               subscriptionStatus.Equals("trialing", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsAllowedRedirectUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var redirectUri))
+            return false;
+
+        var allowedOrigins = configuration.GetValue<string>("Allowed_Origins")
+            ?.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+        if (allowedOrigins == null || allowedOrigins.Length == 0)
+            return false;
+
+        return allowedOrigins.Any(origin =>
+        {
+            if (!Uri.TryCreate(origin, UriKind.Absolute, out var originUri))
+                return false;
+
+            return originUri.Scheme.Equals(redirectUri.Scheme, StringComparison.OrdinalIgnoreCase) &&
+                   originUri.Host.Equals(redirectUri.Host, StringComparison.OrdinalIgnoreCase) &&
+                   originUri.Port == redirectUri.Port;
+        });
     }
 
     public async Task GrantSubscriptionToUser(GrantSubscriptionRequest request)

@@ -73,6 +73,7 @@ builder.Services.AddScoped<NotificationTypeRepository>();
 builder.Services.AddScoped<UserProfileRepository>();
 builder.Services.AddScoped<UserRoleRepository>();
 builder.Services.AddScoped<UserCustomerRepository>();
+builder.Services.AddScoped<StripeWebhookEventRepository>();
 builder.Services.AddScoped<PlanOptionRepository>();
 builder.Services.AddScoped<UserNotificationRepository>();
 builder.Services.AddScoped<ArchivedAppointmentsRepository>();
@@ -101,7 +102,7 @@ builder.Services.AddScoped<JobService>();
 builder.Services.AddScoped<UserRoleService>();
 builder.Services.AddScoped<AppointmentArchiveService>();
 
-builder.Services.AddScoped<SmtpClient>(serviceProvider =>
+builder.Services.AddTransient<SmtpClient>(serviceProvider =>
 {
     var config = serviceProvider.GetRequiredService<IConfiguration>();
     var smtpHost = config.GetValue<string>("Smtp:Host");
@@ -116,9 +117,12 @@ builder.Services.AddScoped<SmtpClient>(serviceProvider =>
         Port = smtpPort ?? throw new Exception("Smtp Port is missing."),
         Credentials =
             new NetworkCredential(smtpUsername ?? throw new Exception("Smtp Username missing"),
-                smtpPassword ?? throw new Exception("Smtp Password missing"))
+                smtpPassword ?? throw new Exception("Smtp Password missing")),
+        Timeout = 10000
     };
 });
+
+builder.Services.AddTransient<IEmailSender<UserEntity>, AwsEmailSender>();
 
 builder.Services.AddHttpClient();
 
@@ -196,10 +200,21 @@ builder.Services.AddQuartzServer(options =>
 });
 builder.Services.ConfigureApplicationCookie(options =>
 {
-    options.Cookie.SameSite = SameSiteMode.None;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-    options.Cookie.Domain = builder.Configuration.GetValue<string>("Auth:Cookie_Domain") ??
-                            throw new Exception("Auth Cookie Domain is missing.");
+    var cookieDomain = builder.Configuration.GetValue<string>("Auth:Cookie_Domain");
+    var isLocalhostCookieDomain = string.IsNullOrWhiteSpace(cookieDomain) ||
+                                  cookieDomain.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                                  cookieDomain.Equals("127.0.0.1") ||
+                                  cookieDomain.Equals("::1");
+
+    if (!isLocalhostCookieDomain)
+    {
+        options.Cookie.Domain = cookieDomain;
+    }
+
+    options.Cookie.SameSite = isLocalhostCookieDomain ? SameSiteMode.Lax : SameSiteMode.None;
+    options.Cookie.SecurePolicy = isLocalhostCookieDomain
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always;
 });
 builder.Services.AddIdentityApiEndpoints<UserEntity>(op =>
     {

@@ -49,7 +49,7 @@ public class NotificationDispatcherService(
         var userProfiles =
             await userProfileRepository.GetUserProfileByIds(trackers.Select(x => x.UserId)
                 .Distinct()
-                .ToList());
+                .ToList(), true);
         foreach (var user in userProfiles)
             userRoleService.UpdateNextNotificationTimeForUser(user, roles);
         await userProfileRepository.UpdateMultipleUserProfiles(userProfiles);
