@@ -88,7 +88,13 @@ public class DiscordNotificationService(
         var messageJson = JsonSerializer.Serialize(message, _jsonSerializerOptions);
         var request = new StringContent(messageJson, Encoding.UTF8, "application/json");
         var response = await httpClient.PostAsync(settings.WebhookUrl, request);
-        if (response.StatusCode != HttpStatusCode.NoContent) throw new Exception();
+        if (response.StatusCode != HttpStatusCode.NoContent)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            logger.LogError("Discord webhook failed with status {StatusCode}: {ErrorContent}", 
+                response.StatusCode, errorContent);
+            throw new Exception($"Discord webhook request failed with status {response.StatusCode}");
+        }
     }
 
     private async Task SendMessageThroughWebhook(TestDiscordSettingsRequest settings,
@@ -102,7 +108,13 @@ public class DiscordNotificationService(
         logger.LogInformation(messageJson);
         var request = new StringContent(messageJson, Encoding.UTF8, "application/json");
         var response = await httpClient.PostAsync(settings.WebhookUrl, request);
-        if (response.StatusCode != HttpStatusCode.NoContent) throw new Exception();
+        if (response.StatusCode != HttpStatusCode.NoContent)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            logger.LogError("Discord test webhook failed with status {StatusCode}: {ErrorContent}", 
+                response.StatusCode, errorContent);
+            throw new Exception($"Discord webhook request failed with status {response.StatusCode}");
+        }
     }
 
     private DiscordWebhookMessageDto GenerateTestMessage()

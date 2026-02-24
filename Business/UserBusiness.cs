@@ -49,9 +49,8 @@ public class UserBusiness(
     /// <returns>DateTime of the next notification check, or null.</returns>
     public async Task<DateTime?> GetNextNotificationCheckForUser(string userId)
     {
-        var userProfileEntity = await userProfileRepository.GetUserProfileById(userId);
-        if (userProfileEntity == null)
-            throw new NullReferenceException("User Profile does not exist");
+        var userProfileEntity = await userProfileRepository.GetUserProfileById(userId)
+            ?? throw new Exception($"User Profile does not exist for userId: {userId}");
         var activeTrackersForUser =
             await trackedLocationRepository.GetTrackedLocationsForUser(userId);
         if (activeTrackersForUser.Count == 0 ||

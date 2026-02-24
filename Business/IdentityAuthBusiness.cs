@@ -45,8 +45,8 @@ public class IdentityAuthBusiness(
 
     public async Task UpdateUser(UpdateUserRequest request, string userId)
     {
-        var user = await userProfileRepository.GetUserProfileById(userId);
-        if (user == null) throw new Exception("User profile not found");
+        var user = await userProfileRepository.GetUserProfileById(userId)
+            ?? throw new Exception($"User profile not found for userId: {userId}");
         user.FirstName = request.FirstName;
         user.LastName = request.LastName;
         await userProfileRepository.UpdateUserProfile(user);
