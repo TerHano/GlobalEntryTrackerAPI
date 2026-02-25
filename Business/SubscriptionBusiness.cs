@@ -633,4 +633,75 @@ public class SubscriptionBusiness(
             throw;
         }
     }
+
+    public async Task<SyncSubscriptionRolesResult> SyncAllUserSubscriptionRoles()
+    {
+        var userIds = await userProfileRepository.GetAllUserIds();
+        var total = 0;
+        var active = 0;
+        var free = 0;
+
+        foreach (var userId in userIds)
+        {
+            total++;
+            if (await SyncUserSubscriptionRole(userId))
+                active++;
+            else
+                free++;
+        }
+
+        return new SyncSubscriptionRolesResult
+        {
+            TotalUsers = total,
+            ActiveSubscriptions = active,
+            FreeUsers = free
+        };
+    }
+
+    public async Task<bool> SyncUserSubscriptionRole(string userId)
+    {
+        var userRoles = await userRoleRepository.GetUserRoleByUserId(userId);
+        var isAdmin = userRoles.Any(x =>
+            string.Equals(x.Code, Role.Admin.GetCode(), StringComparison.OrdinalIgnoreCase));
+
+        var userCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
+        if (userCustomer == null || string.IsNullOrWhiteSpace(userCustomer.SubscriptionId))
+        {
+            if (!isAdmin)
+                await userRoleRepository.AddEditRoleForUser(userId, Role.Free);
+            return false;
+        }
+
+        var subscriptionService = new SubscriptionService();
+        Subscription? subscription;
+        try
+        {
+            subscription = await subscriptionService.GetAsync(userCustomer.SubscriptionId);
+        }
+        catch (StripeException ex)
+        {
+            logger.LogError(ex, "Stripe API error when syncing subscription role for user {UserId}", userId);
+            if (!isAdmin)
+                await userRoleRepository.AddEditRoleForUser(userId, Role.Free);
+            return false;
+        }
+
+        if (subscription == null)
+        {
+            logger.LogWarning("Stripe subscription not found for user {UserId}", userId);
+            if (!isAdmin)
+                await userRoleRepository.AddEditRoleForUser(userId, Role.Free);
+            return false;
+        }
+
+        if (IsSubscriptionActive(subscription.Status))
+        {
+            await userRoleRepository.AddEditRoleForUser(userId, Role.Subscriber);
+            return true;
+        }
+
+        if (!isAdmin)
+            await userRoleRepository.AddEditRoleForUser(userId, Role.Free);
+        return false;
+    }
 }

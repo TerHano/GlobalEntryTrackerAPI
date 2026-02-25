@@ -133,5 +133,35 @@ public static class AdminEndpoints
             .Produces<ApiResponse<object>>()
             .Produces<ApiResponse<object>>(StatusCodes.Status401Unauthorized)
             .Produces<ApiResponse<object>>(StatusCodes.Status403Forbidden);
+
+        app.MapPost("/api/v1/admin/sync-subscription-role/{userId}",
+                async (string userId, SubscriptionBusiness subscriptionBusiness) =>
+                {
+                    var isActive = await subscriptionBusiness.SyncUserSubscriptionRole(userId);
+                    return Results.Ok(new { UserId = userId, IsActive = isActive });
+                })
+            .RequireAuthorization("Admin")
+            .WithTags("Admin")
+            .WithName("SyncSubscriptionRoleForUser")
+            .WithSummary("Sync subscription role for a user")
+            .WithDescription("Reconciles a user's subscription role with Stripe.")
+            .Produces<ApiResponse<object>>()
+            .Produces<ApiResponse<object>>(StatusCodes.Status401Unauthorized)
+            .Produces<ApiResponse<object>>(StatusCodes.Status403Forbidden);
+
+        app.MapPost("/api/v1/admin/sync-subscription-roles",
+                async (SubscriptionBusiness subscriptionBusiness) =>
+                {
+                    var result = await subscriptionBusiness.SyncAllUserSubscriptionRoles();
+                    return Results.Ok(result);
+                })
+            .RequireAuthorization("Admin")
+            .WithTags("Admin")
+            .WithName("SyncAllSubscriptionRoles")
+            .WithSummary("Sync subscription roles for all users")
+            .WithDescription("Reconciles all users' subscription roles with Stripe.")
+            .Produces<ApiResponse<object>>()
+            .Produces<ApiResponse<object>>(StatusCodes.Status401Unauthorized)
+            .Produces<ApiResponse<object>>(StatusCodes.Status403Forbidden);
     }
 }

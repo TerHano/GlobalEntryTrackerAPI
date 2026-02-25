@@ -62,6 +62,32 @@ public class AdminUserSeederService(
 
                 // Check if user is already an admin
                 var isAdmin = await userManager.IsInRoleAsync(existingUser, nameof(Role.Admin));
+                if (!isAdmin && !options.DryRun)
+                {
+                    var grantResult = await userManager.AddToRoleAsync(existingUser, nameof(Role.Admin));
+                    if (!grantResult.Succeeded)
+                    {
+                        var errors = string.Join(", ", grantResult.Errors.Select(e => e.Description));
+                        logger.LogError("Failed to assign admin role to existing user: {Errors}", errors);
+                        return new AdminUserSeedResult
+                        {
+                            Success = false,
+                            ErrorMessage = $"Failed to assign admin role to existing user: {errors}",
+                            UserAlreadyExists = true,
+                            Email = options.Email,
+                            UserId = existingUser.Id
+                        };
+                    }
+
+                    logger.LogInformation("Successfully assigned Admin role to existing user '{Email}'",
+                        options.Email);
+                    isAdmin = true;
+                }
+                else if (!isAdmin && options.DryRun)
+                {
+                    logger.LogInformation("DRY RUN: Would assign Admin role to existing user '{Email}'",
+                        options.Email);
+                }
 
                 return new AdminUserSeedResult
                 {
