@@ -277,34 +277,6 @@ public class SubscriptionBusiness(
 
             switch (stripeEvent.Type)
             {
-                case EventTypes.CustomerSubscriptionCreated:
-                {
-                    if (stripeEvent.Data.Object is not Subscription subscriptionEvent)
-                    {
-                        logger.LogError("Subscription event is null");
-                        throw new NullReferenceException("Subscription event is null");
-                    }
-
-                    var userId = await ResolveUserId(subscriptionEvent);
-                    if (string.IsNullOrWhiteSpace(userId))
-                    {
-                        logger.LogWarning(
-                            "UserId not found while processing subscription created event");
-                        break;
-                    }
-
-
-                    var userCustomer = new UserCustomerEntity
-                    {
-                        UserId = userId,
-                        SubscriptionId = subscriptionEvent.Id,
-                        CustomerId = subscriptionEvent.CustomerId
-                    };
-                    await userCustomerRepository.AddEditUserCustomer(userCustomer);
-                    await ActivateSubscriptionForUser(userId);
-
-                    break;
-                }
                 case EventTypes.CustomerSubscriptionUpdated:
                 {
                     if (stripeEvent.Data.Object is not Subscription subscriptionEvent)
@@ -373,6 +345,16 @@ public class SubscriptionBusiness(
                         throw new NullReferenceException("Invoice event is null");
                     }
 
+                    // Skip the initial invoice on a new subscription — checkout.session.completed
+                    // already handles that case. Processing both simultaneously is what causes the
+                    // duplicate key race condition on AspNetUserRoles.
+                    if (invoice.BillingReason == "subscription_create")
+                    {
+                        logger.LogInformation(
+                            "Skipping invoice.paid for new subscription (billing_reason=subscription_create) — handled by checkout.session.completed");
+                        break;
+                    }
+
                     if (string.IsNullOrWhiteSpace(invoice.CustomerId))
                     {
                         logger.LogWarning("Invoice paid event does not include a customer id");
@@ -401,6 +383,15 @@ public class SubscriptionBusiness(
 
                     logger.LogWarning("Invoice payment failed for customer {CustomerId}",
                         invoice.CustomerId);
+
+                    if (string.IsNullOrWhiteSpace(invoice.CustomerId)) break;
+
+                    var userCustomer =
+                        await userCustomerRepository.GetCustomerDetailsForCustomerId(
+                            invoice.CustomerId);
+                    if (userCustomer == null) break;
+
+                    await userRoleRepository.RemoveRoleForUser(userCustomer.UserId, Role.Subscriber);
                     break;
                 }
                 case EventTypes.CustomerSubscriptionDeleted:
@@ -420,6 +411,17 @@ public class SubscriptionBusiness(
                     }
 
                     await userRoleRepository.RemoveRoleForUser(userId, Role.Subscriber);
+
+                    var deletedUserCustomer =
+                        await userCustomerRepository.GetCustomerDetailsForUser(userId);
+                    if (deletedUserCustomer != null)
+                        await userCustomerRepository.AddEditUserCustomer(new UserCustomerEntity
+                        {
+                            UserId = userId,
+                            CustomerId = deletedUserCustomer.CustomerId,
+                            SubscriptionId = null
+                        });
+
                     break;
                 }
                 default:
@@ -621,7 +623,31 @@ public class SubscriptionBusiness(
             logger.LogInformation("Subscription created successfully: {SubscriptionId}",
                 subscription.Id);
 
-            // Webhook will handle saving customer and subscription relationship to database
+            await userCustomerRepository.AddEditUserCustomer(new UserCustomerEntity
+            {
+                UserId = request.UserId,
+                CustomerId = customerId,
+                SubscriptionId = subscription.Id
+            });
+            logger.LogInformation(
+                "Subscription {SubscriptionId} saved to database for user {UserId}",
+                subscription.Id, request.UserId);
+
+            if (IsSubscriptionActive(subscription.Status))
+            {
+                // Do not activate directly here — the webhook (customer.subscription.updated)
+                // will fire and handle activation. Activating here AND in the webhook simultaneously
+                // is a second source of the duplicate key race condition on AspNetUserRoles.
+                logger.LogInformation(
+                    "Subscription {SubscriptionId} is active for user {UserId} — role will be activated via webhook",
+                    subscription.Id, request.UserId);
+            }
+            else
+            {
+                logger.LogWarning(
+                    "Subscription {SubscriptionId} created with non-active status '{Status}', role not activated",
+                    subscription.Id, subscription.Status);
+            }
         }
         catch (StripeException ex)
         {

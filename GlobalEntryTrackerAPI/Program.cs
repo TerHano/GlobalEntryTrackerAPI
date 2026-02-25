@@ -18,6 +18,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Quartz;
 using Quartz.AspNetCore;
+using Serilog;
 using Service;
 using Service.Jobs;
 using Service.Notification;
@@ -25,6 +26,21 @@ using Stripe;
 using GlobalEntryTrackerAPI.Jobs;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, services, configuration) =>
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .WriteTo.Console()
+        .WriteTo.File(
+            path: "logs/log-.txt",
+            rollingInterval: RollingInterval.Day,
+            retainedFileCountLimit: 30,
+            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}"
+        );
+});
 
 const string globalEntryTrackerPolicy = "GlobalEntryTrackerPolicy";
 var allowedOriginsConfig = builder.Configuration.GetValue<string>("Allowed_Origins");
@@ -235,6 +251,8 @@ builder.Services.AddIdentityApiEndpoints<UserEntity>(op =>
     .AddEntityFrameworkStores<GlobalEntryTrackerDbContext>()
     .AddDefaultTokenProviders();
 var app = builder.Build();
+
+app.UseSerilogRequestLogging();
 
 
 // Configure the HTTP request pipeline.

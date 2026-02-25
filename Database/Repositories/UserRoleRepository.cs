@@ -16,8 +16,7 @@ public class UserRoleRepository(
     {
         try
         {
-            var user = await userManager.FindByIdAsync(userId);
-            if (user == null) throw new NullReferenceException("User not found");
+            var user = await GetUserOrThrow(userId);
             var roleName = role.ToString();
             if (!await userManager.IsInRoleAsync(user, roleName))
                 await userManager.AddToRoleAsync(user, roleName);
@@ -31,10 +30,8 @@ public class UserRoleRepository(
 
     public async Task<List<RoleEntity>> GetUserRoleByUserId(string userId)
     {
-        var user = await userManager.FindByIdAsync(userId);
-        if (user == null) throw new NullReferenceException("User not found");
+        var user = await GetUserOrThrow(userId);
         var roles = await userManager.GetRolesAsync(user);
-        //get role entities from the database
         var roleEntities = await roleManager.Roles
             .Where(r => roles.Contains(r.Name))
             .ToListAsync();
@@ -45,16 +42,26 @@ public class UserRoleRepository(
     {
         try
         {
-            var user = await userManager.FindByIdAsync(userId)
-                       ?? throw new InvalidOperationException($"User not found with ID: {userId}");
+            var user = await GetUserOrThrow(userId);
             var roleName = role.ToString();
 
-            // Remove all existing roles so a user can only hold one role at a time
+            // GetRolesAsync always queries the store, so no re-fetch is needed to bust
+            // any in-memory cache on the entity instance.
             var currentRoles = await userManager.GetRolesAsync(user);
             if (currentRoles.Count > 0)
                 await userManager.RemoveFromRolesAsync(user, currentRoles);
 
-            await userManager.AddToRoleAsync(user, roleName);
+
+            if (!await userManager.IsInRoleAsync(user, roleName))
+                await userManager.AddToRoleAsync(user, roleName);
+        }
+        catch (DbUpdateException ex) when (IsDuplicateRoleAssignment(ex))
+        {
+            // A concurrent request already assigned the same role (e.g. checkout.session.completed
+            // and invoice.paid arriving simultaneously). This is safe to ignore.
+            logger?.LogWarning(
+                "Concurrent duplicate role assignment for role {Role} on user {UserId} — ignoring",
+                role, userId);
         }
         catch (DbUpdateException ex)
         {
@@ -79,8 +86,7 @@ public class UserRoleRepository(
     {
         try
         {
-            var user = await userManager.FindByIdAsync(userId)
-                       ?? throw new InvalidOperationException($"User not found with ID: {userId}");
+            var user = await GetUserOrThrow(userId);
             var roleName = role.ToString();
             if (await userManager.IsInRoleAsync(user, roleName))
                 await userManager.RemoveFromRoleAsync(user, roleName);
@@ -103,6 +109,12 @@ public class UserRoleRepository(
             throw new InvalidOperationException(
                 $"Unexpected error removing role {role} for user {userId}", ex);
         }
+    }
+
+    private async Task<UserEntity> GetUserOrThrow(string userId)
+    {
+        return await userManager.FindByIdAsync(userId)
+               ?? throw new InvalidOperationException($"User not found with ID: {userId}");
     }
 
     private static bool IsDuplicateRoleAssignment(DbUpdateException ex)
