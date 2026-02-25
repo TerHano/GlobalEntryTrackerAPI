@@ -96,26 +96,15 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
 
                 await userManager.AddToRoleAsync(user, nameof(Role.Free));
                 await authBusiness.CreateUser(request, userId);
-
-                var isEmailEnabled = configuration.GetValue("EMAIL__ENABLED", true);
-                if (isEmailEnabled)
-                {
-                    await SendConfirmationEmailAsync(user, userManager, context, email);
-                }
-                else
-                {
-                    // Auto-confirm email when email is disabled
-                    var confirmToken = await userManager.GenerateEmailConfirmationTokenAsync(user);
-                    await userManager.ConfirmEmailAsync(user, confirmToken);
-                }
-
+                await SendConfirmationEmailAsync(user, userManager, context, email);
                 // Note: Not signing in automatically since email confirmation is required
-                // User must confirm their email first before they can log in (if email is enabled)
+                // User must confirm their email first before they can log in
                 return TypedResults.Ok();
             }).WithTags("Authentication")
             .WithName("SignUp")
             .WithSummary("Register a new user")
-            .WithDescription("Creates a new user account with the provided registration details.")
+            .WithDescription(
+                "Creates a new user account with the provided registration details. A confirmation email has been sent. Please check your inbox and confirm your email before logging in.")
             .Accepts<CreateUserRequest>("application/json")
             .Produces<ApiResponse<object>>()
             .Produces<ApiResponse<object>>(StatusCodes.Status400BadRequest);
@@ -153,13 +142,8 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
                     if (!result.Succeeded)
                     {
                         if (result.IsNotAllowed)
-                        {
-                            var isEmailEnabled = configuration.GetValue("EMAIL__ENABLED", true);
-                            var message = isEmailEnabled
-                                ? "Please confirm your email before logging in. Check your inbox for the confirmation email."
-                                : "Account confirmation required. Please try again.";
-                            throw new IncorrectLoginInformationException(message);
-                        }
+                            throw new IncorrectLoginInformationException(
+                                "Please confirm your email before logging in. Check your inbox for the confirmation email.");
 
                         throw new IncorrectLoginInformationException("Wrong email or password.");
                     }
@@ -483,9 +467,6 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
             if (confirmEmailEndpointName is null)
                 throw new NotSupportedException("No email confirmation endpoint was registered!");
 
-            var configuration = context.RequestServices.GetRequiredService<IConfiguration>();
-            var isEmailEnabled = configuration.GetValue("EMAIL__ENABLED", true);
-
             var code = isChange
                 ? await userManager.GenerateChangeEmailTokenAsync(user, email)
                 : await userManager.GenerateEmailConfirmationTokenAsync(user);
@@ -507,9 +488,8 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
                 ?? throw new NotSupportedException(
                     $"Could not find endpoint named '{confirmEmailEndpointName}'.");
 
-            if (isEmailEnabled)
-                await emailSender.SendConfirmationLinkAsync(user, email,
-                    HtmlEncoder.Default.Encode(confirmEmailUrl));
+            await emailSender.SendConfirmationLinkAsync(user, email,
+                HtmlEncoder.Default.Encode(confirmEmailUrl));
         }
 
         return new IdentityEndpointsConventionBuilder(routeGroup);

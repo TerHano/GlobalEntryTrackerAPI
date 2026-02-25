@@ -67,11 +67,6 @@ builder.Services.AddDbContextFactory<GlobalEntryTrackerDbContext>(opt =>
 #if DEBUG
     opt.EnableSensitiveDataLogging();
 #endif
-    opt.UseSeeding((context, _) => { SeedUtil.Seed(context); });
-    opt.UseAsyncSeeding(async (context, _, cancellationToken) =>
-    {
-        await SeedUtil.SeedAsync(context, cancellationToken);
-    });
 });
 
 builder.Services.AddMemoryCache();
@@ -259,7 +254,6 @@ app.MapEntryAlertIdentityApi<UserEntity>();
 // Notification endpoints
 app.MapDiscordNotificationEndpoints();
 app.MapEmailNotificationEndpoints();
-
 
 
 using (var scope = app.Services.CreateScope())

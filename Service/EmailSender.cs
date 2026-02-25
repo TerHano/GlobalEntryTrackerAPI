@@ -16,7 +16,6 @@ public class EmailSender
     public EmailSender(SmtpClient smtpClient, IConfiguration configuration)
     {
         _smtpClient = smtpClient;
-        _configuration = configuration;
         var fromAddress =
             configuration["Smtp:From_Address"] ?? null;
         var fromName =
@@ -36,10 +35,6 @@ public class EmailSender
         if (string.IsNullOrEmpty(confirmationLink))
             throw new ArgumentNullException(nameof(confirmationLink));
 
-        var isEmailEnabled = _configuration.GetValue("EMAIL__ENABLED", true);
-        if (!isEmailEnabled)
-            // Skip sending email if email is disabled
-            return;
 
         var message = new MailMessage
         {
@@ -68,11 +63,6 @@ public class EmailSender
         if (string.IsNullOrEmpty(resetLink))
             throw new ArgumentNullException(nameof(resetLink));
 
-        var isEmailEnabled = _configuration.GetValue("EMAIL__ENABLED", true);
-        if (!isEmailEnabled)
-            // Skip sending email if email is disabled
-            return Task.CompletedTask;
-
         var message = new MailMessage
         {
             From = new MailAddress(_fromAddress, _fromName),
@@ -91,11 +81,6 @@ public class EmailSender
         if (string.IsNullOrEmpty(email)) throw new ArgumentNullException(nameof(email));
         if (string.IsNullOrEmpty(resetCode))
             throw new ArgumentNullException(nameof(resetCode));
-
-        var isEmailEnabled = _configuration.GetValue("EMAIL__ENABLED", true);
-        if (!isEmailEnabled)
-            // Skip sending email if email is disabled
-            return Task.CompletedTask;
 
         var message = new MailMessage
         {
