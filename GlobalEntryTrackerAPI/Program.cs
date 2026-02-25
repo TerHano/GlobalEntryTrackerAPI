@@ -26,7 +26,14 @@ using Stripe;
 var builder = WebApplication.CreateBuilder(args);
 
 const string globalEntryTrackerPolicy = "GlobalEntryTrackerPolicy";
-var allowedOrigins = builder.Configuration.GetValue<string>("Allowed_Origins") ?? "";
+var allowedOriginsConfig = builder.Configuration.GetValue<string>("Allowed_Origins");
+if (string.IsNullOrWhiteSpace(allowedOriginsConfig))
+    throw new Exception("Allowed_Origins configuration is required and cannot be empty.");
+
+var allowedOrigins = allowedOriginsConfig
+    .Split(",", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+if (allowedOrigins.Length == 0)
+    throw new Exception("At least one allowed origin must be configured in Allowed_Origins.");
 
 StripeConfiguration.ApiKey = builder.Configuration.GetValue<string>("Stripe:Secret_Key") ??
                              throw new Exception("Stripe Secret Key is missing.");
@@ -38,7 +45,7 @@ builder.Services.AddCors(options =>
         {
             policy.AllowAnyMethod();
             policy.AllowAnyHeader();
-            policy.WithOrigins(allowedOrigins.Split(","));
+            policy.WithOrigins(allowedOrigins);
             policy.AllowCredentials();
         });
 });
@@ -57,7 +64,9 @@ var connectionString =
 builder.Services.AddDbContextFactory<GlobalEntryTrackerDbContext>(opt =>
 {
     opt.UseNpgsql(connectionString);
+#if DEBUG
     opt.EnableSensitiveDataLogging();
+#endif
     opt.UseSeeding((context, _) => { SeedUtil.Seed(context); });
     opt.UseAsyncSeeding(async (context, _, cancellationToken) =>
     {
@@ -202,14 +211,12 @@ builder.Services.ConfigureApplicationCookie(options =>
 {
     var cookieDomain = builder.Configuration.GetValue<string>("Auth:Cookie_Domain");
     var isLocalhostCookieDomain = string.IsNullOrWhiteSpace(cookieDomain) ||
-                                  cookieDomain.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                                  cookieDomain.Equals("localhost",
+                                      StringComparison.OrdinalIgnoreCase) ||
                                   cookieDomain.Equals("127.0.0.1") ||
                                   cookieDomain.Equals("::1");
 
-    if (!isLocalhostCookieDomain)
-    {
-        options.Cookie.Domain = cookieDomain;
-    }
+    if (!isLocalhostCookieDomain) options.Cookie.Domain = cookieDomain;
 
     options.Cookie.SameSite = isLocalhostCookieDomain ? SameSiteMode.Lax : SameSiteMode.None;
     options.Cookie.SecurePolicy = isLocalhostCookieDomain
@@ -223,26 +230,20 @@ builder.Services.AddIdentityApiEndpoints<UserEntity>(op =>
     .AddRoles<RoleEntity>()
     .AddEntityFrameworkStores<GlobalEntryTrackerDbContext>()
     .AddDefaultTokenProviders();
-
 var app = builder.Build();
 
-// Place this before app.UseAuthentication();
-// app.Use(async (context, next) =>
-// {
-//     var token = context.Request.Cookies[AuthCookie.AccessTokenName];
-//     if (!string.IsNullOrEmpty(token)) context.Request.Headers.Authorization = $"Bearer {token}";
-//     await next();
-// });
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment()) app.UseSwagger();
 
-//app.UseHttpsRedirection();
-//app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
+if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
 
 app.UseCors(globalEntryTrackerPolicy);
 
 app.UseMiddleware<ApiResponseMiddleware>();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapLocationEndpoints();
 app.MapLocationTrackerEndpoints();
@@ -255,13 +256,10 @@ app.MapStripeWebHooks();
 app.MapAdminEndpoints();
 app.MapEntryAlertIdentityApi<UserEntity>();
 
-
-//Notification endpoints
+// Notification endpoints
 app.MapDiscordNotificationEndpoints();
 app.MapEmailNotificationEndpoints();
 
-app.UseAuthentication();
-app.UseAuthorization();
 
 
 using (var scope = app.Services.CreateScope())

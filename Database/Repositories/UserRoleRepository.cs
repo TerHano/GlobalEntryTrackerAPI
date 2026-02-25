@@ -43,20 +43,24 @@ public class UserRoleRepository(
     {
         try
         {
-            var user = await userManager.FindByIdAsync(userId);
-            if (user == null) throw new NullReferenceException("User not found");
+            var user = await userManager.FindByIdAsync(userId) 
+                ?? throw new InvalidOperationException($"User not found with ID: {userId}");
             if (!await userManager.IsInRoleAsync(user, nameof(role)))
                 await userManager.AddToRoleAsync(user, nameof(role));
         }
         catch (DbUpdateException ex)
         {
-            logger?.LogError(ex.Message);
-            throw new DbUpdateException("Failed to add role for user", ex);
+            logger?.LogError(ex, "Database error adding role {Role} to user {UserId}", role, userId);
+            throw new InvalidOperationException($"Failed to add role {role} for user {userId}", ex);
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex.Message);
-            throw new Exception("Failed to add role for user", ex);
+            logger?.LogError(ex, "Unexpected error adding role {Role} to user {UserId}", role, userId);
+            throw new InvalidOperationException($"Unexpected error adding role {role} for user {userId}", ex);
         }
     }
 
@@ -64,20 +68,24 @@ public class UserRoleRepository(
     {
         try
         {
-            var user = await userManager.FindByIdAsync(userId);
-            if (user == null) throw new NullReferenceException("User not found");
+            var user = await userManager.FindByIdAsync(userId)
+                ?? throw new InvalidOperationException($"User not found with ID: {userId}");
             if (await userManager.IsInRoleAsync(user, nameof(role)))
                 await userManager.RemoveFromRoleAsync(user, nameof(role));
         }
         catch (DbUpdateException ex)
         {
-            logger?.LogError(ex.Message);
-            throw new DbUpdateException("Failed to remove role for user", ex);
+            logger?.LogError(ex, "Database error removing role {Role} from user {UserId}", role, userId);
+            throw new InvalidOperationException($"Failed to remove role {role} for user {userId}", ex);
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex.Message);
-            throw new Exception("Failed to add role for user", ex);
+            logger?.LogError(ex, "Unexpected error removing role {Role} from user {UserId}", role, userId);
+            throw new InvalidOperationException($"Unexpected error removing role {role} for user {userId}", ex);
         }
     }
 }
