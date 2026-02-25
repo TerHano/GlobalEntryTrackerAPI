@@ -6,5 +6,5 @@ public class UserCustomerEntity
     public string UserId { get; set; }
     public UserEntity User { get; set; } = null!;
     public required string CustomerId { get; set; }
-    public required string SubscriptionId { get; set; }
+    public string? SubscriptionId { get; set; }
 }

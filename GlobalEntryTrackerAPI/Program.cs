@@ -8,10 +8,10 @@ using Database.Entities;
 using Database.Repositories;
 using GlobalEntryTrackerAPI.Endpoints;
 using GlobalEntryTrackerAPI.Endpoints.Notifications;
+using GlobalEntryTrackerAPI.Endpoints.Webhooks;
 using GlobalEntryTrackerAPI.Extensions;
 using GlobalEntryTrackerAPI.Middleware;
 using GlobalEntryTrackerAPI.Util;
-using GlobalEntryTrackerAPI.Webhooks;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +22,7 @@ using Service;
 using Service.Jobs;
 using Service.Notification;
 using Stripe;
+using GlobalEntryTrackerAPI.Jobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -192,6 +193,14 @@ builder.Services.AddQuartz(q =>
         .WithIdentity("ActiveJob-trigger").StartNow().WithSimpleSchedule(s =>
             s.WithIntervalInHours(24)
                 .RepeatForever()));
+
+    var syncJobKey = new JobKey("SyncSubscriptionRolesJob");
+    q.AddJob<SyncSubscriptionRolesJob>(opts => opts.WithIdentity(syncJobKey));
+    q.AddTrigger(opts => opts
+        .ForJob(syncJobKey)
+        .WithIdentity("SyncSubscriptionRoles-trigger").StartNow().WithSimpleSchedule(s =>
+            s.WithIntervalInHours(24)
+                .RepeatForever()));
 });
 
 builder.Services.AddAuthorizationBuilder()
@@ -255,15 +264,5 @@ app.MapEntryAlertIdentityApi<UserEntity>();
 app.MapDiscordNotificationEndpoints();
 app.MapEmailNotificationEndpoints();
 
-
-using (var scope = app.Services.CreateScope())
-{
-    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<RoleEntity>>();
-    if (!roleManager.Roles.Any())
-    {
-        var roles = SeedUtil.GetRoles();
-        foreach (var roleEntity in roles) await roleManager.CreateAsync(roleEntity);
-    }
-}
 
 app.Run();

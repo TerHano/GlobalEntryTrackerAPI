@@ -3,6 +3,7 @@ using Database.Enums;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace Database.Repositories;
 
@@ -17,8 +18,9 @@ public class UserRoleRepository(
         {
             var user = await userManager.FindByIdAsync(userId);
             if (user == null) throw new NullReferenceException("User not found");
-            if (!await userManager.IsInRoleAsync(user, nameof(role)))
-                await userManager.AddToRoleAsync(user, nameof(role));
+            var roleName = role.ToString();
+            if (!await userManager.IsInRoleAsync(user, roleName))
+                await userManager.AddToRoleAsync(user, roleName);
         }
         catch (DbUpdateException ex)
         {
@@ -43,14 +45,21 @@ public class UserRoleRepository(
     {
         try
         {
-            var user = await userManager.FindByIdAsync(userId) 
-                ?? throw new InvalidOperationException($"User not found with ID: {userId}");
-            if (!await userManager.IsInRoleAsync(user, nameof(role)))
-                await userManager.AddToRoleAsync(user, nameof(role));
+            var user = await userManager.FindByIdAsync(userId)
+                       ?? throw new InvalidOperationException($"User not found with ID: {userId}");
+            var roleName = role.ToString();
+
+            // Remove all existing roles so a user can only hold one role at a time
+            var currentRoles = await userManager.GetRolesAsync(user);
+            if (currentRoles.Count > 0)
+                await userManager.RemoveFromRolesAsync(user, currentRoles);
+
+            await userManager.AddToRoleAsync(user, roleName);
         }
         catch (DbUpdateException ex)
         {
-            logger?.LogError(ex, "Database error adding role {Role} to user {UserId}", role, userId);
+            logger?.LogError(ex, "Database error adding role {Role} to user {UserId}", role,
+                userId);
             throw new InvalidOperationException($"Failed to add role {role} for user {userId}", ex);
         }
         catch (InvalidOperationException)
@@ -59,8 +68,10 @@ public class UserRoleRepository(
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "Unexpected error adding role {Role} to user {UserId}", role, userId);
-            throw new InvalidOperationException($"Unexpected error adding role {role} for user {userId}", ex);
+            logger?.LogError(ex, "Unexpected error adding role {Role} to user {UserId}", role,
+                userId);
+            throw new InvalidOperationException(
+                $"Unexpected error adding role {role} for user {userId}", ex);
         }
     }
 
@@ -69,14 +80,17 @@ public class UserRoleRepository(
         try
         {
             var user = await userManager.FindByIdAsync(userId)
-                ?? throw new InvalidOperationException($"User not found with ID: {userId}");
-            if (await userManager.IsInRoleAsync(user, nameof(role)))
-                await userManager.RemoveFromRoleAsync(user, nameof(role));
+                       ?? throw new InvalidOperationException($"User not found with ID: {userId}");
+            var roleName = role.ToString();
+            if (await userManager.IsInRoleAsync(user, roleName))
+                await userManager.RemoveFromRoleAsync(user, roleName);
         }
         catch (DbUpdateException ex)
         {
-            logger?.LogError(ex, "Database error removing role {Role} from user {UserId}", role, userId);
-            throw new InvalidOperationException($"Failed to remove role {role} for user {userId}", ex);
+            logger?.LogError(ex, "Database error removing role {Role} from user {UserId}", role,
+                userId);
+            throw new InvalidOperationException($"Failed to remove role {role} for user {userId}",
+                ex);
         }
         catch (InvalidOperationException)
         {
@@ -84,8 +98,16 @@ public class UserRoleRepository(
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "Unexpected error removing role {Role} from user {UserId}", role, userId);
-            throw new InvalidOperationException($"Unexpected error removing role {role} for user {userId}", ex);
+            logger?.LogError(ex, "Unexpected error removing role {Role} from user {UserId}", role,
+                userId);
+            throw new InvalidOperationException(
+                $"Unexpected error removing role {role} for user {userId}", ex);
         }
+    }
+
+    private static bool IsDuplicateRoleAssignment(DbUpdateException ex)
+    {
+        return ex.InnerException is PostgresException postgresException &&
+               postgresException.SqlState == PostgresErrorCodes.UniqueViolation;
     }
 }

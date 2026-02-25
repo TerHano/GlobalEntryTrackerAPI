@@ -116,6 +116,8 @@ public class SubscriptionBusiness(
         var userCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
         if (userCustomer == null)
             return false;
+        if (string.IsNullOrWhiteSpace(userCustomer.SubscriptionId))
+            return false;
         var service = new SubscriptionService();
         var subscription = await service.GetAsync(userCustomer.SubscriptionId);
         //User has a valid and active subscription
@@ -170,6 +172,8 @@ public class SubscriptionBusiness(
             return friendsAndFamilyPlan;
         var userCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
         if (userCustomer == null)
+            return freePlanInformation;
+        if (string.IsNullOrWhiteSpace(userCustomer.SubscriptionId))
             return freePlanInformation;
         var service = new SubscriptionService();
         var subscription = await service.GetAsync(userCustomer.SubscriptionId);
@@ -274,159 +278,156 @@ public class SubscriptionBusiness(
             switch (stripeEvent.Type)
             {
                 case EventTypes.CustomerSubscriptionCreated:
+                {
+                    if (stripeEvent.Data.Object is not Subscription subscriptionEvent)
                     {
-                        if (stripeEvent.Data.Object is not Subscription subscriptionEvent)
-                        {
-                            logger.LogError("Subscription event is null");
-                            throw new NullReferenceException("Subscription event is null");
-                        }
+                        logger.LogError("Subscription event is null");
+                        throw new NullReferenceException("Subscription event is null");
+                    }
 
-                        var userId = await ResolveUserId(subscriptionEvent);
-                        if (string.IsNullOrWhiteSpace(userId))
-                        {
-                            logger.LogWarning("UserId not found while processing subscription created event");
-                            break;
-                        }
-
-
-                        var userCustomer = new UserCustomerEntity
-                        {
-                            UserId = userId,
-                            SubscriptionId = subscriptionEvent.Id,
-                            CustomerId = subscriptionEvent.CustomerId
-                        };
-                        await userCustomerRepository.AddEditUserCustomer(userCustomer);
-                        await ActivateSubscriptionForUser(userId);
-
+                    var userId = await ResolveUserId(subscriptionEvent);
+                    if (string.IsNullOrWhiteSpace(userId))
+                    {
+                        logger.LogWarning(
+                            "UserId not found while processing subscription created event");
                         break;
                     }
-                case EventTypes.CustomerSubscriptionUpdated:
+
+
+                    var userCustomer = new UserCustomerEntity
                     {
-                        if (stripeEvent.Data.Object is not Subscription subscriptionEvent)
-                        {
-                            logger.LogError("Subscription event is null");
-                            throw new NullReferenceException("Subscription event is null");
-                        }
+                        UserId = userId,
+                        SubscriptionId = subscriptionEvent.Id,
+                        CustomerId = subscriptionEvent.CustomerId
+                    };
+                    await userCustomerRepository.AddEditUserCustomer(userCustomer);
+                    await ActivateSubscriptionForUser(userId);
 
-                        var userId = await ResolveUserId(subscriptionEvent);
-                        if (string.IsNullOrWhiteSpace(userId))
-                        {
-                            logger.LogWarning("UserId not found while processing subscription updated event");
-                            break;
-                        }
+                    break;
+                }
+                case EventTypes.CustomerSubscriptionUpdated:
+                {
+                    if (stripeEvent.Data.Object is not Subscription subscriptionEvent)
+                    {
+                        logger.LogError("Subscription event is null");
+                        throw new NullReferenceException("Subscription event is null");
+                    }
 
+                    var userId = await ResolveUserId(subscriptionEvent);
+                    if (string.IsNullOrWhiteSpace(userId))
+                    {
+                        logger.LogWarning(
+                            "UserId not found while processing subscription updated event");
+                        break;
+                    }
+
+                    await userCustomerRepository.AddEditUserCustomer(new UserCustomerEntity
+                    {
+                        UserId = userId,
+                        SubscriptionId = subscriptionEvent.Id,
+                        CustomerId = subscriptionEvent.CustomerId
+                    });
+
+                    if (IsSubscriptionActive(subscriptionEvent.Status))
+                        await ActivateSubscriptionForUser(userId);
+                    else
+                        await userRoleRepository.RemoveRoleForUser(userId, Role.Subscriber);
+
+                    break;
+                }
+                case EventTypes.CheckoutSessionCompleted:
+                {
+                    if (stripeEvent.Data.Object is not Session checkoutSession)
+                    {
+                        logger.LogError("Checkout session event is null");
+                        throw new NullReferenceException("Checkout session event is null");
+                    }
+
+                    var userId = ResolveUserId(checkoutSession);
+                    if (string.IsNullOrWhiteSpace(userId))
+                    {
+                        logger.LogWarning(
+                            "UserId not found while processing checkout.session.completed event");
+                        break;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(checkoutSession.CustomerId) &&
+                        !string.IsNullOrWhiteSpace(checkoutSession.SubscriptionId))
                         await userCustomerRepository.AddEditUserCustomer(new UserCustomerEntity
                         {
                             UserId = userId,
-                            SubscriptionId = subscriptionEvent.Id,
-                            CustomerId = subscriptionEvent.CustomerId
+                            CustomerId = checkoutSession.CustomerId,
+                            SubscriptionId = checkoutSession.SubscriptionId
                         });
 
-                        if (IsSubscriptionActive(subscriptionEvent.Status))
-                        {
-                            await ActivateSubscriptionForUser(userId);
-                        }
-                        else
-                        {
-                            await userRoleRepository.RemoveRoleForUser(userId, Role.Subscriber);
-                        }
+                    if (checkoutSession.PaymentStatus == "paid")
+                        await ActivateSubscriptionForUser(userId);
 
-                        break;
-                    }
-                case EventTypes.CheckoutSessionCompleted:
-                    {
-                        if (stripeEvent.Data.Object is not Session checkoutSession)
-                        {
-                            logger.LogError("Checkout session event is null");
-                            throw new NullReferenceException("Checkout session event is null");
-                        }
-
-                        var userId = ResolveUserId(checkoutSession);
-                        if (string.IsNullOrWhiteSpace(userId))
-                        {
-                            logger.LogWarning("UserId not found while processing checkout.session.completed event");
-                            break;
-                        }
-
-                        if (!string.IsNullOrWhiteSpace(checkoutSession.CustomerId) &&
-                            !string.IsNullOrWhiteSpace(checkoutSession.SubscriptionId))
-                        {
-                            await userCustomerRepository.AddEditUserCustomer(new UserCustomerEntity
-                            {
-                                UserId = userId,
-                                CustomerId = checkoutSession.CustomerId,
-                                SubscriptionId = checkoutSession.SubscriptionId
-                            });
-                        }
-
-                        if (checkoutSession.PaymentStatus == "paid")
-                        {
-                            await ActivateSubscriptionForUser(userId);
-                        }
-
-                        break;
-                    }
+                    break;
+                }
                 case EventTypes.InvoicePaid:
+                {
+                    if (stripeEvent.Data.Object is not Invoice invoice)
                     {
-                        if (stripeEvent.Data.Object is not Invoice invoice)
-                        {
-                            logger.LogError("Invoice event is null");
-                            throw new NullReferenceException("Invoice event is null");
-                        }
+                        logger.LogError("Invoice event is null");
+                        throw new NullReferenceException("Invoice event is null");
+                    }
 
-                        if (string.IsNullOrWhiteSpace(invoice.CustomerId))
-                        {
-                            logger.LogWarning("Invoice paid event does not include a customer id");
-                            break;
-                        }
-
-                        var userCustomer =
-                            await userCustomerRepository.GetCustomerDetailsForCustomerId(invoice.CustomerId);
-                        if (userCustomer == null)
-                        {
-                            logger.LogWarning("User customer mapping not found for invoice paid event");
-                            break;
-                        }
-
-                        await ActivateSubscriptionForUser(userCustomer.UserId);
+                    if (string.IsNullOrWhiteSpace(invoice.CustomerId))
+                    {
+                        logger.LogWarning("Invoice paid event does not include a customer id");
                         break;
                     }
-                case EventTypes.InvoicePaymentFailed:
-                    {
-                        if (stripeEvent.Data.Object is not Invoice invoice)
-                        {
-                            logger.LogError("Invoice event is null");
-                            throw new NullReferenceException("Invoice event is null");
-                        }
 
-                        logger.LogWarning("Invoice payment failed for customer {CustomerId}",
+                    var userCustomer =
+                        await userCustomerRepository.GetCustomerDetailsForCustomerId(
                             invoice.CustomerId);
+                    if (userCustomer == null)
+                    {
+                        logger.LogWarning("User customer mapping not found for invoice paid event");
                         break;
                     }
+
+                    await ActivateSubscriptionForUser(userCustomer.UserId);
+                    break;
+                }
+                case EventTypes.InvoicePaymentFailed:
+                {
+                    if (stripeEvent.Data.Object is not Invoice invoice)
+                    {
+                        logger.LogError("Invoice event is null");
+                        throw new NullReferenceException("Invoice event is null");
+                    }
+
+                    logger.LogWarning("Invoice payment failed for customer {CustomerId}",
+                        invoice.CustomerId);
+                    break;
+                }
                 case EventTypes.CustomerSubscriptionDeleted:
+                {
+                    if (stripeEvent.Data.Object is not Subscription subscriptionEvent)
                     {
-                        if (stripeEvent.Data.Object is not Subscription subscriptionEvent)
-                        {
-                            logger.LogError("Subscription event is null");
-                            throw new NullReferenceException("Subscription event is null");
-                        }
+                        logger.LogError("Subscription event is null");
+                        throw new NullReferenceException("Subscription event is null");
+                    }
 
-                        var userId = await ResolveUserId(subscriptionEvent);
-                        if (string.IsNullOrWhiteSpace(userId))
-                        {
-                            logger.LogWarning("UserId not found while processing subscription deleted event");
-                            break;
-                        }
-
-                        await userRoleRepository.RemoveRoleForUser(userId, Role.Subscriber);
+                    var userId = await ResolveUserId(subscriptionEvent);
+                    if (string.IsNullOrWhiteSpace(userId))
+                    {
+                        logger.LogWarning(
+                            "UserId not found while processing subscription deleted event");
                         break;
                     }
+
+                    await userRoleRepository.RemoveRoleForUser(userId, Role.Subscriber);
+                    break;
+                }
                 default:
-                    {
-                        logger.LogInformation("Unhandled Stripe event type {StripeEventType}",
-                            stripeEvent.Type);
-                        break;
-                    }
+                {
+                    logger.LogInformation("Unhandled Stripe event type {StripeEventType}",
+                        stripeEvent.Type);
+                    break;
+                }
             }
 
             await stripeWebhookEventRepository.MarkProcessed(stripeEventId);
@@ -434,7 +435,6 @@ public class SubscriptionBusiness(
         catch (Exception ex)
         {
             if (!string.IsNullOrWhiteSpace(stripeEventId))
-            {
                 try
                 {
                     await stripeWebhookEventRepository.ReleaseProcessingLock(stripeEventId);
@@ -445,7 +445,6 @@ public class SubscriptionBusiness(
                         "Failed to release Stripe webhook processing lock for event {StripeEventId}",
                         stripeEventId);
                 }
-            }
 
             logger.LogError(ex, "Error processing Stripe webhook event");
             throw new ApplicationException(
@@ -479,7 +478,8 @@ public class SubscriptionBusiness(
         if (!string.IsNullOrWhiteSpace(subscription.CustomerId))
         {
             var existingUserCustomer =
-                await userCustomerRepository.GetCustomerDetailsForCustomerId(subscription.CustomerId);
+                await userCustomerRepository.GetCustomerDetailsForCustomerId(
+                    subscription.CustomerId);
             if (existingUserCustomer != null)
                 return existingUserCustomer.UserId;
         }
@@ -529,7 +529,8 @@ public class SubscriptionBusiness(
             if (!Uri.TryCreate(origin, UriKind.Absolute, out var originUri))
                 return false;
 
-            return originUri.Scheme.Equals(redirectUri.Scheme, StringComparison.OrdinalIgnoreCase) &&
+            return originUri.Scheme.Equals(redirectUri.Scheme,
+                       StringComparison.OrdinalIgnoreCase) &&
                    originUri.Host.Equals(redirectUri.Host, StringComparison.OrdinalIgnoreCase) &&
                    originUri.Port == redirectUri.Port;
         });
@@ -537,43 +538,174 @@ public class SubscriptionBusiness(
 
     public async Task GrantSubscriptionToUser(GrantSubscriptionRequest request)
     {
-        var user = await userProfileRepository.GetUserProfileById(request.UserId);
-        var customerService = new CustomerService();
-        var customer = await customerService.CreateAsync(
-            new CustomerCreateOptions
+        try
+        {
+            var user = await userProfileRepository.GetUserProfileById(request.UserId);
+            if (user == null)
+                throw new NullReferenceException($"User not found for userId: {request.UserId}");
+
+            // Check if customer already exists
+            var existingUserCustomer =
+                await userCustomerRepository.GetCustomerDetailsForUser(request.UserId);
+
+            string customerId;
+            if (existingUserCustomer != null)
             {
-                Email = user.Email,
-                Name = user.FirstName + " " + user.LastName
-            });
-        if (customer == null)
-            throw new NullReferenceException("Customer creation failed");
+                logger.LogInformation("Using existing customer {CustomerId} for user {UserId}",
+                    existingUserCustomer.CustomerId, request.UserId);
+                customerId = existingUserCustomer.CustomerId;
+            }
+            else
+            {
+                logger.LogInformation("Creating new customer for user {UserId} with email {Email}",
+                    request.UserId, user.Email);
+                var customerService = new CustomerService();
+                var customer = await customerService.CreateAsync(
+                    new CustomerCreateOptions
+                    {
+                        Email = user.Email,
+                        Name = user.FirstName + " " + user.LastName
+                    });
+                if (customer == null)
+                    throw new NullReferenceException(
+                        "Customer creation failed - Stripe returned null");
+                customerId = customer.Id;
+                logger.LogInformation("Customer created successfully: {CustomerId}", customerId);
+
+                // Save the customer to database immediately to prevent duplicate customers if subscription creation fails
+                await userCustomerRepository.AddEditUserCustomer(new UserCustomerEntity
+                {
+                    UserId = request.UserId,
+                    CustomerId = customerId
+                });
+                logger.LogInformation("Customer {CustomerId} saved to database for user {UserId}",
+                    customerId, request.UserId);
+            }
+
+            logger.LogInformation(
+                "Creating subscription for customer {CustomerId} with price {PriceId} and user {UserId}",
+                customerId, request.PriceId, request.UserId);
+
+            var couponId = configuration["Stripe:Admin_Grant_Coupon_Id"];
+            if (string.IsNullOrWhiteSpace(couponId))
+                throw new InvalidOperationException("Admin grant coupon id is missing.");
+
+            var subscriptionService = new SubscriptionService();
+            var subscription = await subscriptionService.CreateAsync(
+                new SubscriptionCreateOptions
+                {
+                    Customer = customerId,
+                    Items =
+                    [
+                        new SubscriptionItemOptions { Price = request.PriceId }
+                    ],
+                    Discounts =
+                    [
+                        new SubscriptionDiscountOptions { Coupon = couponId }
+                    ],
+                    Metadata = new Dictionary<string, string>
+                    {
+                        { "userId", request.UserId }
+                    }
+                });
+
+            if (subscription == null)
+            {
+                logger.LogError(
+                    "Subscription creation returned null. Details: CustomerId={CustomerId}, PriceId={PriceId}, UserId={UserId}",
+                    customerId, request.PriceId, request.UserId);
+                throw new NullReferenceException(
+                    $"Subscription creation failed - Stripe returned null. CustomerId: {customerId}, PriceId: {request.PriceId}");
+            }
+
+            logger.LogInformation("Subscription created successfully: {SubscriptionId}",
+                subscription.Id);
+
+            // Webhook will handle saving customer and subscription relationship to database
+        }
+        catch (StripeException ex)
+        {
+            logger.LogError(ex,
+                "Stripe API error when creating subscription. Error Description: {ErrorDescription}, Message: {Message}, Code: {Code}",
+                ex.StripeError?.ErrorDescription, ex.Message, ex.StripeError?.Code);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unexpected error when creating subscription for user {UserId}",
+                request.UserId);
+            throw;
+        }
+    }
+
+    public async Task<SyncSubscriptionRolesResult> SyncAllUserSubscriptionRoles()
+    {
+        var userIds = await userProfileRepository.GetAllUserIds();
+        var total = 0;
+        var active = 0;
+        var free = 0;
+
+        foreach (var userId in userIds)
+        {
+            total++;
+            if (await SyncUserSubscriptionRole(userId))
+                active++;
+            else
+                free++;
+        }
+
+        return new SyncSubscriptionRolesResult
+        {
+            TotalUsers = total,
+            ActiveSubscriptions = active,
+            FreeUsers = free
+        };
+    }
+
+    public async Task<bool> SyncUserSubscriptionRole(string userId)
+    {
+        var userRoles = await userRoleRepository.GetUserRoleByUserId(userId);
+        var isAdmin = userRoles.Any(x =>
+            string.Equals(x.Code, Role.Admin.GetCode(), StringComparison.OrdinalIgnoreCase));
+
+        var userCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
+        if (userCustomer == null || string.IsNullOrWhiteSpace(userCustomer.SubscriptionId))
+        {
+            if (!isAdmin)
+                await userRoleRepository.AddEditRoleForUser(userId, Role.Free);
+            return false;
+        }
+
         var subscriptionService = new SubscriptionService();
-        var subscription = await subscriptionService.CreateAsync(
-            new SubscriptionCreateOptions
-            {
-                Customer = customer.Id,
-                TrialEnd = DateTime.UtcNow.AddYears(1),
-                TrialFromPlan = true,
-                TrialSettings =
-                {
-                    EndBehavior =
-                    {
-                        MissingPaymentMethod = "cancel"
-                    }
-                },
-                Items =
-                [
-                    new SubscriptionItemOptions
-                    {
-                        Price = request.PriceId
-                    }
-                ],
-                Metadata = new Dictionary<string, string>
-                {
-                    { "userId", request.UserId }
-                }
-            });
+        Subscription? subscription;
+        try
+        {
+            subscription = await subscriptionService.GetAsync(userCustomer.SubscriptionId);
+        }
+        catch (StripeException ex)
+        {
+            logger.LogError(ex, "Stripe API error when syncing subscription role for user {UserId}", userId);
+            if (!isAdmin)
+                await userRoleRepository.AddEditRoleForUser(userId, Role.Free);
+            return false;
+        }
+
         if (subscription == null)
-            throw new NullReferenceException("Subscription creation failed");
+        {
+            logger.LogWarning("Stripe subscription not found for user {UserId}", userId);
+            if (!isAdmin)
+                await userRoleRepository.AddEditRoleForUser(userId, Role.Free);
+            return false;
+        }
+
+        if (IsSubscriptionActive(subscription.Status))
+        {
+            await userRoleRepository.AddEditRoleForUser(userId, Role.Subscriber);
+            return true;
+        }
+
+        if (!isAdmin)
+            await userRoleRepository.AddEditRoleForUser(userId, Role.Free);
+        return false;
     }
 }

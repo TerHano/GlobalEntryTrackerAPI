@@ -148,4 +148,10 @@ public class UserProfileRepository(
                 .ToListAsync();
         return users;
     }
+
+    public async Task<List<string>> GetAllUserIds()
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+        return await context.Users.Select(x => x.Id).ToListAsync();
+    }
 }

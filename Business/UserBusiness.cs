@@ -93,7 +93,7 @@ public class UserBusiness(
     /// <param name="role">Role to assign.</param>
     public async Task AssignRoleForUser(string userId, Role role)
     {
-        await userRoleRepository.CreateUserRole(userId, role);
+        await userRoleRepository.AddEditRoleForUser(userId, role);
     }
 
     /// <summary>
