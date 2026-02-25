@@ -12,13 +12,6 @@ public class UserRoleRepository(
     RoleManager<RoleEntity> roleManager,
     ILogger<UserRoleRepository> logger)
 {
-    private static readonly HashSet<Role> TierRoles =
-    [
-        Role.Free,
-        Role.Subscriber,
-        Role.FriendsFamily
-    ];
-
     public async Task CreateUserRole(string userId, Role role)
     {
         try
@@ -56,18 +49,12 @@ public class UserRoleRepository(
                        ?? throw new InvalidOperationException($"User not found with ID: {userId}");
             var roleName = role.ToString();
 
-            if (TierRoles.Contains(role))
-                foreach (var tierRole in TierRoles)
-                {
-                    if (tierRole == role)
-                        continue;
-                    var tierRoleName = tierRole.ToString();
-                    if (await userManager.IsInRoleAsync(user, tierRoleName))
-                        await userManager.RemoveFromRoleAsync(user, tierRoleName);
-                }
+            // Remove all existing roles so a user can only hold one role at a time
+            var currentRoles = await userManager.GetRolesAsync(user);
+            if (currentRoles.Count > 0)
+                await userManager.RemoveFromRolesAsync(user, currentRoles);
 
-            if (!await userManager.IsInRoleAsync(user, roleName))
-                await userManager.AddToRoleAsync(user, roleName);
+            await userManager.AddToRoleAsync(user, roleName);
         }
         catch (DbUpdateException ex)
         {
