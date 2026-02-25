@@ -211,14 +211,12 @@ builder.Services.ConfigureApplicationCookie(options =>
 {
     var cookieDomain = builder.Configuration.GetValue<string>("Auth:Cookie_Domain");
     var isLocalhostCookieDomain = string.IsNullOrWhiteSpace(cookieDomain) ||
-                                  cookieDomain.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                                  cookieDomain.Equals("localhost",
+                                      StringComparison.OrdinalIgnoreCase) ||
                                   cookieDomain.Equals("127.0.0.1") ||
                                   cookieDomain.Equals("::1");
 
-    if (!isLocalhostCookieDomain)
-    {
-        options.Cookie.Domain = cookieDomain;
-    }
+    if (!isLocalhostCookieDomain) options.Cookie.Domain = cookieDomain;
 
     options.Cookie.SameSite = isLocalhostCookieDomain ? SameSiteMode.Lax : SameSiteMode.None;
     options.Cookie.SecurePolicy = isLocalhostCookieDomain
@@ -238,14 +236,14 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment()) app.UseSwagger();
 
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHttpsRedirection();
-}
+if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
 
 app.UseCors(globalEntryTrackerPolicy);
 
 app.UseMiddleware<ApiResponseMiddleware>();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapLocationEndpoints();
 app.MapLocationTrackerEndpoints();
@@ -258,13 +256,10 @@ app.MapStripeWebHooks();
 app.MapAdminEndpoints();
 app.MapEntryAlertIdentityApi<UserEntity>();
 
-
-//Notification endpoints
+// Notification endpoints
 app.MapDiscordNotificationEndpoints();
 app.MapEmailNotificationEndpoints();
 
-app.UseAuthentication();
-app.UseAuthorization();
 
 
 using (var scope = app.Services.CreateScope())
