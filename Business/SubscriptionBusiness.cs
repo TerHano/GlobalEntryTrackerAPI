@@ -116,6 +116,8 @@ public class SubscriptionBusiness(
         var userCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
         if (userCustomer == null)
             return false;
+        if (string.IsNullOrWhiteSpace(userCustomer.SubscriptionId))
+            return false;
         var service = new SubscriptionService();
         var subscription = await service.GetAsync(userCustomer.SubscriptionId);
         //User has a valid and active subscription
@@ -170,6 +172,8 @@ public class SubscriptionBusiness(
             return friendsAndFamilyPlan;
         var userCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
         if (userCustomer == null)
+            return freePlanInformation;
+        if (string.IsNullOrWhiteSpace(userCustomer.SubscriptionId))
             return freePlanInformation;
         var service = new SubscriptionService();
         var subscription = await service.GetAsync(userCustomer.SubscriptionId);
