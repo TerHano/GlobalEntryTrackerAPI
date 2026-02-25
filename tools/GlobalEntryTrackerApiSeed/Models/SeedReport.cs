@@ -11,6 +11,10 @@ public class SeedReport
     public StripeCatalogSeedResult? StripeCatalogSeed { get; init; }
 
     public StripeSubscriberBackfillResult? StripeSubscriberBackfill { get; init; }
+
+    public NotificationTypeSeedResult? NotificationTypeSeed { get; init; }
+
+    public AdminUserSeedResult? AdminUserSeed { get; init; }
 }
 
 public class ReportOutputOptions

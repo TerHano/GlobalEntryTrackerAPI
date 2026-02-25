@@ -1,7 +1,9 @@
 ﻿using System.Text.Json;
 using Database;
+using Database.Entities;
 using GlobalEntryTrackerApiSeed.Models;
 using GlobalEntryTrackerApiSeed.Services;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,11 +27,20 @@ var connectionString = GetConnectionString(builder.Configuration);
 builder.Services.AddDbContextFactory<GlobalEntryTrackerDbContext>(options =>
     options.UseNpgsql(connectionString));
 
+// Identity
+builder.Services.AddIdentityCore<UserEntity>()
+    .AddRoles<RoleEntity>()
+    .AddEntityFrameworkStores<GlobalEntryTrackerDbContext>()
+    .AddUserManager<UserManager<UserEntity>>()
+    .AddRoleManager<RoleManager<RoleEntity>>();
+
 // Services
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<AppointmentLocationSeederService>();
 builder.Services.AddSingleton<StripeCatalogSeederService>();
 builder.Services.AddSingleton<StripeSubscriberBackfillService>();
+builder.Services.AddSingleton<NotificationTypeSeederService>();
+builder.Services.AddScoped<AdminUserSeederService>();
 
 var host = builder.Build();
 
@@ -39,17 +50,22 @@ var runStripeCatalogSeed =
     args.Contains("--seed-stripe-catalog", StringComparer.OrdinalIgnoreCase);
 var runStripeSubscriberBackfill =
     args.Contains("--backfill-stripe-subscribers", StringComparer.OrdinalIgnoreCase);
+var runNotificationTypeSeed =
+    args.Contains("--seed-notification-types", StringComparer.OrdinalIgnoreCase);
+var runAdminUserSeed =
+    args.Contains("--seed-admin-user", StringComparer.OrdinalIgnoreCase);
 var dryRunFromArgs = args.Contains("--dry-run", StringComparer.OrdinalIgnoreCase);
 var dryRun = dryRunFromArgs || ParseBool(
     builder.Configuration["DRY_RUN"] ?? Environment.GetEnvironmentVariable("DRY_RUN"),
     false);
 
-if (!runLocationSeed && !runStripeCatalogSeed && !runStripeSubscriberBackfill)
+if (!runLocationSeed && !runStripeCatalogSeed && !runStripeSubscriberBackfill &&
+    !runNotificationTypeSeed && !runAdminUserSeed)
 {
     var logger = host.Services.GetRequiredService<ILoggerFactory>()
         .CreateLogger("Program");
     logger.LogError(
-        "No valid mode was provided. Use --seed-locations, --seed-stripe-catalog, and/or --backfill-stripe-subscribers.");
+        "No valid mode was provided. Use --seed-locations, --seed-stripe-catalog, --backfill-stripe-subscribers, --seed-notification-types, and/or --seed-admin-user.");
     return 1;
 }
 
@@ -57,6 +73,8 @@ var exitCode = 0;
 LocationSeedResult? locationSeedResult = null;
 StripeCatalogSeedResult? stripeCatalogSeedResult = null;
 StripeSubscriberBackfillResult? stripeSubscriberBackfillResult = null;
+NotificationTypeSeedResult? notificationTypeSeedResult = null;
+AdminUserSeedResult? adminUserSeedResult = null;
 
 if (runLocationSeed)
 {
@@ -95,6 +113,31 @@ if (runStripeSubscriberBackfill)
     }
 }
 
+if (runNotificationTypeSeed)
+{
+    var notificationTypeSeederService = host.Services
+        .GetRequiredService<NotificationTypeSeederService>();
+    notificationTypeSeedResult =
+        await notificationTypeSeederService.SeedNotificationTypesAsync(dryRun);
+    if (!notificationTypeSeedResult.Success)
+    {
+        exitCode = 1;
+    }
+}
+
+if (runAdminUserSeed)
+{
+    using var scope = host.Services.CreateScope();
+    var adminUserSeederService = scope.ServiceProvider
+        .GetRequiredService<AdminUserSeederService>();
+    var adminOptions = GetAdminUserSeedOptions(builder.Configuration, dryRun);
+    adminUserSeedResult = await adminUserSeederService.SeedAdminUserAsync(adminOptions);
+    if (!adminUserSeedResult.Success)
+    {
+        exitCode = 1;
+    }
+}
+
 if (dryRun)
 {
     var reportOptions = GetReportOutputOptions(builder.Configuration);
@@ -104,7 +147,9 @@ if (dryRun)
         DryRun = true,
         LocationSeed = locationSeedResult,
         StripeCatalogSeed = stripeCatalogSeedResult,
-        StripeSubscriberBackfill = stripeSubscriberBackfillResult
+        StripeSubscriberBackfill = stripeSubscriberBackfillResult,
+        NotificationTypeSeed = notificationTypeSeedResult,
+        AdminUserSeed = adminUserSeedResult
     };
 
     var logger = host.Services.GetRequiredService<ILoggerFactory>()
@@ -131,7 +176,7 @@ static string GetConnectionString(IConfiguration configuration)
 {
     // Prefer a full connection string if provided (useful for Docker/production)
     var envConnectionString = configuration["CONNECTION_STRING"] ??
-                             Environment.GetEnvironmentVariable("CONNECTION_STRING");
+                              Environment.GetEnvironmentVariable("CONNECTION_STRING");
 
     if (!string.IsNullOrWhiteSpace(envConnectionString))
     {
@@ -142,7 +187,8 @@ static string GetConnectionString(IConfiguration configuration)
     var dbHost = configuration["DB_HOST"] ?? Environment.GetEnvironmentVariable("DB_HOST");
     var dbPort = configuration["DB_PORT"] ?? Environment.GetEnvironmentVariable("DB_PORT");
     var dbUser = configuration["DB_USER"] ?? Environment.GetEnvironmentVariable("DB_USER");
-    var dbPassword = configuration["DB_PASSWORD"] ?? Environment.GetEnvironmentVariable("DB_PASSWORD");
+    var dbPassword = configuration["DB_PASSWORD"] ??
+                     Environment.GetEnvironmentVariable("DB_PASSWORD");
     var dbName = configuration["DB_NAME"] ?? Environment.GetEnvironmentVariable("DB_NAME");
 
     var missing = new List<string>();
@@ -158,7 +204,8 @@ static string GetConnectionString(IConfiguration configuration)
             $"Missing required database configuration: {string.Join(", ", missing)}");
     }
 
-    return $"Host={dbHost};Port={dbPort};Username={dbUser};Password={dbPassword};Database={dbName};Include Error Detail=true";
+    return
+        $"Host={dbHost};Port={dbPort};Username={dbUser};Password={dbPassword};Database={dbName};Include Error Detail=true";
 }
 
 static StripeCatalogSeedOptions GetStripeCatalogSeedOptions(
@@ -237,7 +284,8 @@ static StripeSubscriberBackfillOptions GetStripeSubscriberBackfillOptions(
 
 static ReportOutputOptions GetReportOutputOptions(IConfiguration configuration)
 {
-    var reportPath = configuration["REPORT_PATH"] ?? Environment.GetEnvironmentVariable("REPORT_PATH");
+    var reportPath = configuration["REPORT_PATH"] ??
+                     Environment.GetEnvironmentVariable("REPORT_PATH");
     if (string.IsNullOrWhiteSpace(reportPath))
     {
         reportPath = "seed-report.json";
@@ -246,5 +294,25 @@ static ReportOutputOptions GetReportOutputOptions(IConfiguration configuration)
     return new ReportOutputOptions
     {
         ReportPath = reportPath
+    };
+}
+
+static AdminUserSeedOptions GetAdminUserSeedOptions(IConfiguration configuration, bool dryRun)
+{
+    var email = configuration["ADMIN_EMAIL"] ?? Environment.GetEnvironmentVariable("ADMIN_EMAIL");
+    var password = configuration["ADMIN_PASSWORD"] ??
+                   Environment.GetEnvironmentVariable("ADMIN_PASSWORD");
+    var firstName = configuration["ADMIN_FIRST_NAME"] ??
+                    Environment.GetEnvironmentVariable("ADMIN_FIRST_NAME");
+    var lastName = configuration["ADMIN_LAST_NAME"] ??
+                   Environment.GetEnvironmentVariable("ADMIN_LAST_NAME");
+
+    return new AdminUserSeedOptions
+    {
+        Email = email ?? string.Empty,
+        Password = password ?? string.Empty,
+        FirstName = firstName,
+        LastName = lastName,
+        DryRun = dryRun
     };
 }
