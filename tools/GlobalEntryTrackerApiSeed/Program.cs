@@ -41,6 +41,7 @@ builder.Services.AddSingleton<StripeCatalogSeederService>();
 builder.Services.AddSingleton<StripeSubscriberBackfillService>();
 builder.Services.AddSingleton<NotificationTypeSeederService>();
 builder.Services.AddScoped<AdminUserSeederService>();
+builder.Services.AddScoped<RoleSeederService>();
 
 var host = builder.Build();
 
@@ -54,18 +55,20 @@ var runNotificationTypeSeed =
     args.Contains("--seed-notification-types", StringComparer.OrdinalIgnoreCase);
 var runAdminUserSeed =
     args.Contains("--seed-admin-user", StringComparer.OrdinalIgnoreCase);
+var runRoleSeed =
+    args.Contains("--seed-roles", StringComparer.OrdinalIgnoreCase);
 var dryRunFromArgs = args.Contains("--dry-run", StringComparer.OrdinalIgnoreCase);
 var dryRun = dryRunFromArgs || ParseBool(
     builder.Configuration["DRY_RUN"] ?? Environment.GetEnvironmentVariable("DRY_RUN"),
     false);
 
 if (!runLocationSeed && !runStripeCatalogSeed && !runStripeSubscriberBackfill &&
-    !runNotificationTypeSeed && !runAdminUserSeed)
+    !runNotificationTypeSeed && !runAdminUserSeed && !runRoleSeed)
 {
     var logger = host.Services.GetRequiredService<ILoggerFactory>()
         .CreateLogger("Program");
     logger.LogError(
-        "No valid mode was provided. Use --seed-locations, --seed-stripe-catalog, --backfill-stripe-subscribers, --seed-notification-types, and/or --seed-admin-user.");
+        "No valid mode was provided. Use --seed-locations, --seed-stripe-catalog, --backfill-stripe-subscribers, --seed-notification-types, --seed-admin-user, and/or --seed-roles.");
     return 1;
 }
 
@@ -75,6 +78,7 @@ StripeCatalogSeedResult? stripeCatalogSeedResult = null;
 StripeSubscriberBackfillResult? stripeSubscriberBackfillResult = null;
 NotificationTypeSeedResult? notificationTypeSeedResult = null;
 AdminUserSeedResult? adminUserSeedResult = null;
+RoleSeedResult? roleSeedResult = null;
 
 if (runLocationSeed)
 {
@@ -138,6 +142,18 @@ if (runAdminUserSeed)
     }
 }
 
+if (runRoleSeed)
+{
+    using var scope = host.Services.CreateScope();
+    var roleSeederService = scope.ServiceProvider
+        .GetRequiredService<RoleSeederService>();
+    roleSeedResult = await roleSeederService.SeedRolesAsync(dryRun);
+    if (!roleSeedResult.Success)
+    {
+        exitCode = 1;
+    }
+}
+
 if (dryRun)
 {
     var reportOptions = GetReportOutputOptions(builder.Configuration);
@@ -149,7 +165,8 @@ if (dryRun)
         StripeCatalogSeed = stripeCatalogSeedResult,
         StripeSubscriberBackfill = stripeSubscriberBackfillResult,
         NotificationTypeSeed = notificationTypeSeedResult,
-        AdminUserSeed = adminUserSeedResult
+        AdminUserSeed = adminUserSeedResult,
+        RoleSeed = roleSeedResult
     };
 
     var logger = host.Services.GetRequiredService<ILoggerFactory>()

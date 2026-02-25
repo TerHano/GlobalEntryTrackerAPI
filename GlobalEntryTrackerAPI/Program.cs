@@ -265,14 +265,4 @@ app.MapDiscordNotificationEndpoints();
 app.MapEmailNotificationEndpoints();
 
 
-using (var scope = app.Services.CreateScope())
-{
-    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<RoleEntity>>();
-    if (!roleManager.Roles.Any())
-    {
-        var roles = SeedUtil.GetRoles();
-        foreach (var roleEntity in roles) await roleManager.CreateAsync(roleEntity);
-    }
-}
-
 app.Run();

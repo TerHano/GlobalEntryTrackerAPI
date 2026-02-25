@@ -15,6 +15,8 @@ public class SeedReport
     public NotificationTypeSeedResult? NotificationTypeSeed { get; init; }
 
     public AdminUserSeedResult? AdminUserSeed { get; init; }
+
+    public RoleSeedResult? RoleSeed { get; init; }
 }
 
 public class ReportOutputOptions
