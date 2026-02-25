@@ -537,43 +537,99 @@ public class SubscriptionBusiness(
 
     public async Task GrantSubscriptionToUser(GrantSubscriptionRequest request)
     {
-        var user = await userProfileRepository.GetUserProfileById(request.UserId);
-        var customerService = new CustomerService();
-        var customer = await customerService.CreateAsync(
-            new CustomerCreateOptions
+        try
+        {
+            var user = await userProfileRepository.GetUserProfileById(request.UserId);
+            if (user == null)
+                throw new NullReferenceException($"User not found for userId: {request.UserId}");
+            
+            // Check if customer already exists
+            var existingUserCustomer = await userCustomerRepository.GetCustomerDetailsForUser(request.UserId);
+            
+            string customerId;
+            if (existingUserCustomer != null)
             {
-                Email = user.Email,
-                Name = user.FirstName + " " + user.LastName
-            });
-        if (customer == null)
-            throw new NullReferenceException("Customer creation failed");
-        var subscriptionService = new SubscriptionService();
-        var subscription = await subscriptionService.CreateAsync(
-            new SubscriptionCreateOptions
+                logger.LogInformation("Using existing customer {CustomerId} for user {UserId}", 
+                    existingUserCustomer.CustomerId, request.UserId);
+                customerId = existingUserCustomer.CustomerId;
+            }
+            else
             {
-                Customer = customer.Id,
-                TrialEnd = DateTime.UtcNow.AddYears(1),
-                TrialFromPlan = true,
-                TrialSettings =
-                {
-                    EndBehavior =
+                logger.LogInformation("Creating new customer for user {UserId} with email {Email}", 
+                    request.UserId, user.Email);
+                var customerService = new CustomerService();
+                var customer = await customerService.CreateAsync(
+                    new CustomerCreateOptions
                     {
-                        MissingPaymentMethod = "cancel"
-                    }
-                },
-                Items =
-                [
-                    new SubscriptionItemOptions
-                    {
-                        Price = request.PriceId
-                    }
-                ],
-                Metadata = new Dictionary<string, string>
+                        Email = user.Email,
+                        Name = user.FirstName + " " + user.LastName
+                    });
+                if (customer == null)
+                    throw new NullReferenceException("Customer creation failed - Stripe returned null");
+                customerId = customer.Id;
+                logger.LogInformation("Customer created successfully: {CustomerId}", customerId);
+                
+                // Save the customer to database immediately to prevent duplicate customers if subscription creation fails
+                await userCustomerRepository.AddEditUserCustomer(new UserCustomerEntity
                 {
-                    { "userId", request.UserId }
-                }
-            });
-        if (subscription == null)
-            throw new NullReferenceException("Subscription creation failed");
+                    UserId = request.UserId,
+                    CustomerId = customerId
+                });
+                logger.LogInformation("Customer {CustomerId} saved to database for user {UserId}", customerId, request.UserId);
+            }
+            
+            logger.LogInformation("Creating subscription for customer {CustomerId} with price {PriceId} and user {UserId}", 
+                customerId, request.PriceId, request.UserId);
+            
+            var subscriptionService = new SubscriptionService();
+            var subscription = await subscriptionService.CreateAsync(
+                new SubscriptionCreateOptions
+                {
+                    Customer = customerId,
+                    TrialEnd = DateTime.UtcNow.AddYears(1),
+                    TrialFromPlan = true,
+                    TrialSettings =
+                    {
+                        EndBehavior =
+                        {
+                            MissingPaymentMethod = "cancel"
+                        }
+                    },
+                    Items =
+                    [
+                        new SubscriptionItemOptions
+                        {
+                            Price = request.PriceId
+                        }
+                    ],
+                    Metadata = new Dictionary<string, string>
+                    {
+                        { "userId", request.UserId }
+                    }
+                });
+            
+            if (subscription == null)
+            {
+                logger.LogError("Subscription creation returned null. Details: CustomerId={CustomerId}, PriceId={PriceId}, UserId={UserId}", 
+                    customerId, request.PriceId, request.UserId);
+                throw new NullReferenceException(
+                    $"Subscription creation failed - Stripe returned null. CustomerId: {customerId}, PriceId: {request.PriceId}");
+            }
+            
+            logger.LogInformation("Subscription created successfully: {SubscriptionId}", subscription.Id);
+            
+            // Webhook will handle saving customer and subscription relationship to database
+        }
+        catch (StripeException ex)
+        {
+            logger.LogError(ex, "Stripe API error when creating subscription. Error Description: {ErrorDescription}, Message: {Message}, Code: {Code}", 
+                ex.StripeError?.ErrorDescription, ex.Message, ex.StripeError?.Code);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unexpected error when creating subscription for user {UserId}", request.UserId);
+            throw;
+        }
     }
 }
