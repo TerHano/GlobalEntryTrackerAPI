@@ -15,6 +15,13 @@ public class EmailNotificationService(
 {
     public async Task SendTestNotification<T>(T settingsToTest)
     {
+        var isEmailEnabled = configuration.GetValue("EMAIL__ENABLED", true);
+        if (!isEmailEnabled)
+        {
+            logger.LogInformation("Email notifications are disabled, skipping test notification");
+            return;
+        }
+
         if (settingsToTest is string email)
         {
             var message = GenerateEmailMessage(email, "Test Email",
@@ -26,6 +33,14 @@ public class EmailNotificationService(
     public async Task SendNotification<T>(List<LocationAppointmentDto> appointments,
         AppointmentLocationEntity locationInformation, T emailNotificationSettings)
     {
+        var isEmailEnabled = configuration.GetValue("EMAIL__ENABLED", true);
+        if (!isEmailEnabled)
+        {
+            logger.LogInformation(
+                "Email notifications are disabled, skipping appointment notification");
+            return;
+        }
+
         if (emailNotificationSettings is not EmailNotificationSettingsEntity
             emailNotificationSettingsEntity)
         {

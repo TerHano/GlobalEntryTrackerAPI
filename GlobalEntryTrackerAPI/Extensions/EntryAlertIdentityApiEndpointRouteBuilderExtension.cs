@@ -96,14 +96,26 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
 
                 await userManager.AddToRoleAsync(user, nameof(Role.Free));
                 await authBusiness.CreateUser(request, userId);
-                await SendConfirmationEmailAsync(user, userManager, context, email);
+
+                var isEmailEnabled = configuration.GetValue("EMAIL__ENABLED", true);
+                if (isEmailEnabled)
+                {
+                    await SendConfirmationEmailAsync(user, userManager, context, email);
+                }
+                else
+                {
+                    // Auto-confirm email when email is disabled
+                    var confirmToken = await userManager.GenerateEmailConfirmationTokenAsync(user);
+                    await userManager.ConfirmEmailAsync(user, confirmToken);
+                }
+
                 // Note: Not signing in automatically since email confirmation is required
-                // User must confirm their email first before they can log in
+                // User must confirm their email first before they can log in (if email is enabled)
                 return TypedResults.Ok();
             }).WithTags("Authentication")
             .WithName("SignUp")
             .WithSummary("Register a new user")
-            .WithDescription("Creates a new user account with the provided registration details. A confirmation email has been sent. Please check your inbox and confirm your email before logging in.")
+            .WithDescription("Creates a new user account with the provided registration details.")
             .Accepts<CreateUserRequest>("application/json")
             .Produces<ApiResponse<object>>()
             .Produces<ApiResponse<object>>(StatusCodes.Status400BadRequest);
@@ -111,14 +123,15 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
 
         routeGroup.MapPost("/login",
                 async Task<Results<Ok<AccessTokenResponse>, EmptyHttpResult, ProblemHttpResult>>
-                    ([FromBody] LoginRequest login, [FromServices] IServiceProvider sp) =>
+                ([FromBody] LoginRequest login, [FromServices] IServiceProvider sp,
+                    IConfiguration configuration) =>
                 {
                     var useCookies = true;
                     var useSessionCookies = false;
                     var signInManager = sp.GetRequiredService<SignInManager<TUser>>();
 
                     var useCookieScheme = useCookies || useSessionCookies;
-                    var isPersistent = useCookies && useSessionCookies != true;
+                    var isPersistent = useCookies && !useSessionCookies;
                     signInManager.AuthenticationScheme = useCookieScheme
                         ? IdentityConstants.ApplicationScheme
                         : IdentityConstants.BearerScheme;
@@ -141,10 +154,16 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
                     {
                         if (result.IsNotAllowed)
                         {
-                            throw new IncorrectLoginInformationException("Please confirm your email before logging in. Check your inbox for the confirmation email.");
+                            var isEmailEnabled = configuration.GetValue("EMAIL__ENABLED", true);
+                            var message = isEmailEnabled
+                                ? "Please confirm your email before logging in. Check your inbox for the confirmation email."
+                                : "Account confirmation required. Please try again.";
+                            throw new IncorrectLoginInformationException(message);
                         }
+
                         throw new IncorrectLoginInformationException("Wrong email or password.");
                     }
+
                     // return TypedResults.Problem(result.ToString(),
                     //     statusCode: StatusCodes.Status401Unauthorized);
                     // The signInManager already produced the needed response in the form of a cookie or bearer token.
@@ -464,6 +483,9 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
             if (confirmEmailEndpointName is null)
                 throw new NotSupportedException("No email confirmation endpoint was registered!");
 
+            var configuration = context.RequestServices.GetRequiredService<IConfiguration>();
+            var isEmailEnabled = configuration.GetValue("EMAIL__ENABLED", true);
+
             var code = isChange
                 ? await userManager.GenerateChangeEmailTokenAsync(user, email)
                 : await userManager.GenerateEmailConfirmationTokenAsync(user);
@@ -485,8 +507,9 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
                 ?? throw new NotSupportedException(
                     $"Could not find endpoint named '{confirmEmailEndpointName}'.");
 
-            await emailSender.SendConfirmationLinkAsync(user, email,
-                HtmlEncoder.Default.Encode(confirmEmailUrl));
+            if (isEmailEnabled)
+                await emailSender.SendConfirmationLinkAsync(user, email,
+                    HtmlEncoder.Default.Encode(confirmEmailUrl));
         }
 
         return new IdentityEndpointsConventionBuilder(routeGroup);
