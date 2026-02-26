@@ -1,4 +1,5 @@
 using Database.Entities;
+using Database.Entities.NotificationSettings;
 using Database.Repositories;
 using Microsoft.Extensions.Logging;
 using Service.Dto;
@@ -18,16 +19,38 @@ public class NotificationManagerService(
     {
         var userNotification =
             await userNotificationRepository.GetUserWithNotificationSettings(userId);
-        var notificationTasks = new List<Task>
-        {
-            SendNotificationForService(
-                NotificationServiceType.Discord, locationAppointments,
-                appointmentLocation, userNotification.DiscordNotificationSettings),
-            SendNotificationForService(NotificationServiceType.Email,
-                locationAppointments, appointmentLocation,
-                userNotification.EmailNotificationSettings)
-        };
+
+        var discordSettings = userNotification.DiscordNotificationSettings;
+        var emailSettings = userNotification.EmailNotificationSettings;
+
+        bool discordAllowed = IsWithinDailyLimit(discordSettings);
+        bool emailAllowed = IsWithinDailyLimit(emailSettings);
+
+        var notificationTasks = new List<Task>();
+
+        if (discordAllowed)
+            notificationTasks.Add(
+                SendNotificationForService(
+                    NotificationServiceType.Discord, locationAppointments,
+                    appointmentLocation, discordSettings));
+
+        if (emailAllowed)
+            notificationTasks.Add(
+                SendNotificationForService(NotificationServiceType.Email,
+                    locationAppointments, appointmentLocation,
+                    userNotification.EmailNotificationSettings));
+
         await Task.WhenAll(notificationTasks);
+
+        if (discordAllowed && discordSettings != null)
+            IncrementDailyCount(discordSettings);
+        if (emailAllowed && emailSettings != null)
+            IncrementDailyCount(emailSettings);
+
+        if (discordAllowed || emailAllowed)
+            await userNotificationRepository.UpdateChannelNotificationCounts(
+                discordAllowed ? discordSettings : null,
+                emailAllowed ? emailSettings : null);
     }
 
     public async Task SendTestMessageForService<T>(NotificationServiceType notificationServiceType,
@@ -36,6 +59,29 @@ public class NotificationManagerService(
         var service = GetNotificationInstanceForService(notificationServiceType);
         if (service == null) throw new ApplicationException("No service found");
         await service.SendTestNotification(notificationSettings);
+    }
+
+    private static bool IsWithinDailyLimit(INotificationSettings? settings)
+    {
+        if (settings == null || !settings.Enabled) return false;
+        if (!settings.MaxNotificationsPerDay.HasValue) return true;
+
+        // Reset the rolling window if more than 24 hours have passed
+        if (settings.DailyNotificationWindowStart.HasValue &&
+            DateTime.UtcNow > settings.DailyNotificationWindowStart.Value.AddHours(24))
+        {
+            settings.DailyNotificationCount = 0;
+            settings.DailyNotificationWindowStart = null;
+        }
+
+        return settings.DailyNotificationCount < settings.MaxNotificationsPerDay.Value;
+    }
+
+    private static void IncrementDailyCount(INotificationSettings settings)
+    {
+        if (settings.DailyNotificationWindowStart == null)
+            settings.DailyNotificationWindowStart = DateTime.UtcNow;
+        settings.DailyNotificationCount++;
     }
 
     private async Task SendNotificationForService<T>(NotificationServiceType serviceType,

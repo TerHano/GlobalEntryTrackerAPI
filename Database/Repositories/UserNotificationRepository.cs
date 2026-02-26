@@ -86,4 +86,34 @@ public class UserNotificationRepository(
         await context.SaveChangesAsync();
         return emailNotificationSettingsEntity.Id;
     }
+
+    public async Task UpdateChannelNotificationCounts(
+        DiscordNotificationSettingsEntity? discordSettings,
+        EmailNotificationSettingsEntity? emailSettings)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync();
+
+        if (discordSettings?.Id > 0)
+        {
+            var discord =
+                await context.DiscordNotificationSettings.FindAsync(discordSettings.Id);
+            if (discord != null)
+            {
+                discord.DailyNotificationCount = discordSettings.DailyNotificationCount;
+                discord.DailyNotificationWindowStart = discordSettings.DailyNotificationWindowStart;
+            }
+        }
+
+        if (emailSettings?.Id > 0)
+        {
+            var email = await context.EmailNotificationSettings.FindAsync(emailSettings.Id);
+            if (email != null)
+            {
+                email.DailyNotificationCount = emailSettings.DailyNotificationCount;
+                email.DailyNotificationWindowStart = emailSettings.DailyNotificationWindowStart;
+            }
+        }
+
+        await context.SaveChangesAsync();
+    }
 }

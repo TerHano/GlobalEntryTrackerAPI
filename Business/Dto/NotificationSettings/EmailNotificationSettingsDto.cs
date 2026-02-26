@@ -9,4 +9,6 @@ public class EmailNotificationSettingsDto
     [Required] public bool Enabled { get; set; }
 
     [Required] public string Email { get; set; } = string.Empty;
+
+    public int? MaxNotificationsPerDay { get; set; }
 }
