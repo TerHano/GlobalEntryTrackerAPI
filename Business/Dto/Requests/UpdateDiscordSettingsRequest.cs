@@ -9,4 +9,6 @@ public class UpdateDiscordSettingsRequest
     [Required] public bool Enabled { get; set; }
 
     [Required] public string WebhookUrl { get; set; }
+
+    public int? MaxNotificationsPerDay { get; set; }
 }

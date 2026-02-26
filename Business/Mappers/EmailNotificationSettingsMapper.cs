@@ -9,8 +9,14 @@ public class EmailNotificationSettingsMapper : Profile
 {
     public EmailNotificationSettingsMapper()
     {
-        CreateMap<EmailNotificationSettingsEntity, EmailNotificationSettingsDto>().ReverseMap();
-        CreateMap<CreateEmailNotificationSettingsRequest, EmailNotificationSettingsEntity>();
-        CreateMap<UpdateEmailNotificationSettingsRequest, EmailNotificationSettingsEntity>();
+        CreateMap<EmailNotificationSettingsEntity, EmailNotificationSettingsDto>().ReverseMap()
+            .ForMember(dest => dest.DailyNotificationCount, opt => opt.Ignore())
+            .ForMember(dest => dest.DailyNotificationWindowStart, opt => opt.Ignore());
+        CreateMap<CreateEmailNotificationSettingsRequest, EmailNotificationSettingsEntity>()
+            .ForMember(dest => dest.DailyNotificationCount, opt => opt.Ignore())
+            .ForMember(dest => dest.DailyNotificationWindowStart, opt => opt.Ignore());
+        CreateMap<UpdateEmailNotificationSettingsRequest, EmailNotificationSettingsEntity>()
+            .ForMember(dest => dest.DailyNotificationCount, opt => opt.Ignore())
+            .ForMember(dest => dest.DailyNotificationWindowStart, opt => opt.Ignore());
     }
 }

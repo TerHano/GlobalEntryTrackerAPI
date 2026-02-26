@@ -18,5 +18,10 @@ public class CreateDiscordSettingsRequestValidator : AbstractValidator<CreateDis
             .WithMessage("Enabled status is required.")
             .Must(x => x is true or false)
             .WithMessage("Enabled status must be a boolean value.");
+
+        RuleFor(x => x.MaxNotificationsPerDay)
+            .GreaterThanOrEqualTo(1)
+            .WithMessage("Max notifications per day must be at least 1.")
+            .When(x => x.MaxNotificationsPerDay.HasValue);
     }
 }
