@@ -39,8 +39,10 @@ public class RoleSeederService(
                         var result = await roleManager.CreateAsync(role);
                         if (!result.Succeeded)
                         {
-                            var errors = string.Join(", ", result.Errors.Select(e => e.Description));
-                            logger.LogError("Failed to create role '{Name}': {Errors}", role.Name, errors);
+                            var errors = string.Join(", ",
+                                result.Errors.Select(e => e.Description));
+                            logger.LogError("Failed to create role '{Name}': {Errors}", role.Name,
+                                errors);
                             return new RoleSeedResult
                             {
                                 Success = false,
@@ -84,10 +86,9 @@ public class RoleSeederService(
         return
         [
             new RoleEntity(nameof(Role.Free), Role.Free.GetCode(), 2, 300),
-            new RoleEntity(nameof(Role.Subscriber), Role.Subscriber.GetCode(), 5, 1000),
+            new RoleEntity(nameof(Role.Subscriber), Role.Subscriber.GetCode(), 5, 10),
             new RoleEntity(nameof(Role.Admin), Role.Admin.GetCode(), 10, 1),
             new RoleEntity(nameof(Role.FriendsFamily), Role.FriendsFamily.GetCode(), 10, 1)
         ];
     }
 }
-
