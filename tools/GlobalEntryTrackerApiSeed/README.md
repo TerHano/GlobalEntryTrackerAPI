@@ -27,36 +27,33 @@ date.
 The application can be configured using either:
 
 1. **Environment Variables** (recommended for Docker/production):
-    - `CONNECTION_STRING` - Full PostgreSQL connection string
-    - Or individual variables:
-        - `DB_HOST` - Database host
-        - `DB_PORT` - Database port (default: 5432)
-        - `DB_USER` - Database username
-        - `DB_PASSWORD` - Database password
-        - `DB_NAME` - Database name
-    - `DRY_RUN` - Optional, default `false` (preview mode with no DB writes)
+   - `CONNECTION_STRING` - Full PostgreSQL connection string
+   - Or individual variables:
+     - `DB_HOST` - Database host
+     - `DB_PORT` - Database port (default: 5432)
+     - `DB_USER` - Database username
+     - `DB_PASSWORD` - Database password
+     - `DB_NAME` - Database name
+   - `DRY_RUN` - Optional, default `false` (preview mode with no DB writes)
 
 - `REPORT_PATH` - Optional, default `seed-report.json` (dry-run JSON output file)
 
 2. **Stripe Catalog Seeding Variables** (required only for Stripe mode):
-
-    - `STRIPE_SECRET_KEY` - Stripe secret key (test or live)
-    - `STRIPE_ONLY_ACTIVE` - Optional, default `true`
-    - `STRIPE_PRODUCT_IDS` - Optional CSV filter by Stripe product IDs
-    - `STRIPE_PRICE_IDS` - Optional CSV filter by Stripe price IDs
+   - `STRIPE_SECRET_KEY` - Stripe secret key (test or live)
+   - `STRIPE_ONLY_ACTIVE` - Optional, default `true`
+   - `STRIPE_PRODUCT_IDS` - Optional CSV filter by Stripe product IDs
+   - `STRIPE_PRICE_IDS` - Optional CSV filter by Stripe price IDs
 
 3. **Stripe Subscriber Backfill Variables** (required only for backfill mode):
-
-    - `STRIPE_SECRET_KEY` - Stripe secret key (test or live)
-    - `STRIPE_BACKFILL_STATUSES` - Optional CSV, default `active,trialing`
-    - `STRIPE_BACKFILL_MATCH_EMAIL` - Optional, default `true` (fallback matching when metadata userId is absent)
+   - `STRIPE_SECRET_KEY` - Stripe secret key (test or live)
+   - `STRIPE_BACKFILL_STATUSES` - Optional CSV, default `active,trialing`
+   - `STRIPE_BACKFILL_MATCH_EMAIL` - Optional, default `true` (fallback matching when metadata userId is absent)
 
 4. **Admin User Seeding Variables** (required only for admin user mode):
-
-    - `ADMIN_EMAIL` - Required, email address for the admin user
-    - `ADMIN_PASSWORD` - Required, password for the admin user
-    - `ADMIN_FIRST_NAME` - Optional, first name for the admin user (default: "Admin")
-    - `ADMIN_LAST_NAME` - Optional, last name for the admin user (default: "User")
+   - `ADMIN_EMAIL` - Required, email address for the admin user
+   - `ADMIN_PASSWORD` - Required, password for the admin user
+   - `ADMIN_FIRST_NAME` - Optional, first name for the admin user (default: "Admin")
+   - `ADMIN_LAST_NAME` - Optional, last name for the admin user (default: "User")
 
 5. **appsettings.json** - Configuration file (for local development)
 
