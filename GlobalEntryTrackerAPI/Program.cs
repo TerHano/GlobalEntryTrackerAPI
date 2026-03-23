@@ -261,6 +261,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddIdentityApiEndpoints<UserEntity>(op =>
     {
         op.SignIn.RequireConfirmedEmail = true;
+        op.Tokens.PasswordResetTokenProvider = TokenOptions.DefaultEmailProvider; // add this
     })
     .AddRoles<RoleEntity>()
     .AddEntityFrameworkStores<GlobalEntryTrackerDbContext>()

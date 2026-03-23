@@ -290,7 +290,7 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
                 if (user is not null && await userManager.IsEmailConfirmedAsync(user))
                 {
                     var code = await userManager.GeneratePasswordResetTokenAsync(user);
-                    code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+                    //code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
 
                     var emailSender = sp.GetRequiredService<IEmailSender<TUser>>();
 
@@ -309,8 +309,8 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
                             ["code"] = code
                         });
 
-                    await emailSender.SendPasswordResetLinkAsync(user, resetRequest.Email,
-                        resetPasswordUrl);
+                    await emailSender.SendPasswordResetCodeAsync(user, resetRequest.Email,
+                        code);
                 }
 
                 // Don't reveal that the user does not exist or is not confirmed, so don't return a 200 if we would have

@@ -6,24 +6,9 @@ using Resend;
 
 namespace Service;
 
-public class ResendEmailSender(IResend resend, GlobalEntryTrackerDbContext dbContext) : IEmailSender<UserEntity>
+public class ResendEmailSender(IResend resend, GlobalEntryTrackerDbContext dbContext)
+    : IEmailSender<UserEntity>
 {
-    private static async Task<string> LoadTemplateAsync(string templateName)
-    {
-        var path = Path.Combine(AppContext.BaseDirectory, "EmailTemplates", templateName);
-        return await File.ReadAllTextAsync(path);
-    }
-
-    private async Task<string> GetDisplayNameAsync(UserEntity user, string email)
-    {
-        var profile = await dbContext.UserProfiles
-            .FirstOrDefaultAsync(p => p.UserId == user.Id);
-
-        return profile is not null
-            ? $"{profile.FirstName} {profile.LastName}".Trim()
-            : user.UserName ?? email;
-    }
-
     public async Task SendConfirmationLinkAsync(UserEntity user, string email,
         string confirmationLink)
     {
@@ -64,13 +49,34 @@ public class ResendEmailSender(IResend resend, GlobalEntryTrackerDbContext dbCon
 
     public async Task SendPasswordResetCodeAsync(UserEntity user, string email, string resetCode)
     {
+        var displayName = await GetDisplayNameAsync(user, email);
+        var template = await LoadTemplateAsync("ResetPasswordCodeTemplate.html");
+        var htmlBody = template.Replace("{UserName}", displayName)
+            .Replace("{ResetCode}", resetCode);
         var message = new EmailMessage
         {
             From = "EntryAlert <no-reply@terhano.com>",
             To = { email },
-            Subject = "Password Reset Code",
-            HtmlBody = $"Your password reset code is: {resetCode}"
+            Subject = "Reset Your Password",
+            HtmlBody = htmlBody
         };
+
         await resend.EmailSendAsync(message);
+    }
+
+    private static async Task<string> LoadTemplateAsync(string templateName)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "EmailTemplates", templateName);
+        return await File.ReadAllTextAsync(path);
+    }
+
+    private async Task<string> GetDisplayNameAsync(UserEntity user, string email)
+    {
+        var profile = await dbContext.UserProfiles
+            .FirstOrDefaultAsync(p => p.UserId == user.Id);
+
+        return profile is not null
+            ? $"{profile.FirstName} {profile.LastName}".Trim()
+            : user.UserName ?? email;
     }
 }
