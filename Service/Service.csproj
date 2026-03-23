@@ -11,6 +11,12 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Content Include="EmailTemplates\*.html">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="AWSSDK.SimpleEmail" Version="4.0.0.15" />
         <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.13" />
         <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="9.0.13" />

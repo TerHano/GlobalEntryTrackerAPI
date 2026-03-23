@@ -1,4 +1,3 @@
-using System.Text.Encodings.Web;
 using Database.Entities;
 using Microsoft.AspNetCore.Identity;
 using Resend;
@@ -7,31 +6,44 @@ namespace Service;
 
 public class ResendEmailSender(IResend resend) : IEmailSender<UserEntity>
 {
+    private static async Task<string> LoadTemplateAsync(string templateName)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "EmailTemplates", templateName);
+        return await File.ReadAllTextAsync(path);
+    }
+
     public async Task SendConfirmationLinkAsync(UserEntity user, string email,
         string confirmationLink)
     {
-        var encodedLink = HtmlEncoder.Default.Encode(confirmationLink);
+        var template = await LoadTemplateAsync("ConfirmEmailTemplate.html");
+        var htmlBody = template
+            .Replace("{UserName}", user.UserName ?? email)
+            .Replace("{ConfirmationLink}", confirmationLink);
+
         var message = new EmailMessage
         {
-            From = "EntryAlert <no-reply@terhano.com>"
+            From = "EntryAlert <no-reply@terhano.com>",
+            To = { email },
+            Subject = "Confirm Your Email",
+            HtmlBody = htmlBody
         };
-        message.To.Add(email);
-        message.Subject = "Email Confirmation";
-        message.HtmlBody =
-            $"<p>Please confirm your email by clicking <a href=\"{encodedLink}\">here</a>.</p>";
 
         await resend.EmailSendAsync(message);
     }
 
     public async Task SendPasswordResetLinkAsync(UserEntity user, string email, string resetLink)
     {
+        var template = await LoadTemplateAsync("ResetPasswordTemplate.html");
+        var htmlBody = template
+            .Replace("{UserName}", user.UserName ?? email)
+            .Replace("{ResetPasswordLink}", resetLink);
+
         var message = new EmailMessage
         {
             From = "EntryAlert <no-reply@terhano.com>",
             To = { email },
-            Subject = "Password Reset",
-            HtmlBody =
-                $"<p>You can reset your password by clicking <a href=\"{resetLink}\">here</a>.</p>"
+            Subject = "Reset Your Password",
+            HtmlBody = htmlBody
         };
         await resend.EmailSendAsync(message);
     }
