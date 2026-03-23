@@ -1,10 +1,12 @@
+using Database;
 using Database.Entities;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Resend;
 
 namespace Service;
 
-public class ResendEmailSender(IResend resend) : IEmailSender<UserEntity>
+public class ResendEmailSender(IResend resend, GlobalEntryTrackerDbContext dbContext) : IEmailSender<UserEntity>
 {
     private static async Task<string> LoadTemplateAsync(string templateName)
     {
@@ -12,12 +14,23 @@ public class ResendEmailSender(IResend resend) : IEmailSender<UserEntity>
         return await File.ReadAllTextAsync(path);
     }
 
+    private async Task<string> GetDisplayNameAsync(UserEntity user, string email)
+    {
+        var profile = await dbContext.UserProfiles
+            .FirstOrDefaultAsync(p => p.UserId == user.Id);
+
+        return profile is not null
+            ? $"{profile.FirstName} {profile.LastName}".Trim()
+            : user.UserName ?? email;
+    }
+
     public async Task SendConfirmationLinkAsync(UserEntity user, string email,
         string confirmationLink)
     {
+        var displayName = await GetDisplayNameAsync(user, email);
         var template = await LoadTemplateAsync("ConfirmEmailTemplate.html");
         var htmlBody = template
-            .Replace("{UserName}", user.UserName ?? email)
+            .Replace("{UserName}", displayName)
             .Replace("{ConfirmationLink}", confirmationLink);
 
         var message = new EmailMessage
@@ -33,9 +46,10 @@ public class ResendEmailSender(IResend resend) : IEmailSender<UserEntity>
 
     public async Task SendPasswordResetLinkAsync(UserEntity user, string email, string resetLink)
     {
+        var displayName = await GetDisplayNameAsync(user, email);
         var template = await LoadTemplateAsync("ResetPasswordTemplate.html");
         var htmlBody = template
-            .Replace("{UserName}", user.UserName ?? email)
+            .Replace("{UserName}", displayName)
             .Replace("{ResetPasswordLink}", resetLink);
 
         var message = new EmailMessage
