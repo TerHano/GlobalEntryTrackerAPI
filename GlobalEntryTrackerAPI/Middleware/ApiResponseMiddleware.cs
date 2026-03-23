@@ -34,9 +34,10 @@ public class ApiResponseMiddleware(RequestDelegate next, ILogger<ApiResponseMidd
                 responseBody.Seek(0, SeekOrigin.Begin);
                 var bodyText = await new StreamReader(responseBody).ReadToEndAsync();
 
-                // Only wrap application/json responses — pass through text/plain, etc. as-is
+                // Only bypass wrapping if content-type is explicitly set to something non-JSON
+                // (e.g. text/plain, image/*, etc.). Empty content-type (e.g. Ok() with no body) should still be wrapped.
                 var contentType = context.Response.ContentType ?? string.Empty;
-                if (!contentType.Contains("application/json", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(contentType) && !contentType.Contains("application/json", StringComparison.OrdinalIgnoreCase))
                 {
                     responseBody.Seek(0, SeekOrigin.Begin);
                     await responseBody.CopyToAsync(originalBodyStream);

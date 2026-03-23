@@ -105,7 +105,7 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
         ;
 
         routeGroup.MapPost("/login",
-                async Task<Results<Ok<AccessTokenResponse>, EmptyHttpResult, ProblemHttpResult>>
+                async Task<Results<Ok<AccessTokenResponse>, Ok, ProblemHttpResult>>
                 ([FromBody] LoginRequest login, [FromServices] IServiceProvider sp,
                     IConfiguration configuration) =>
                 {
@@ -145,7 +145,7 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
                     // return TypedResults.Problem(result.ToString(),
                     //     statusCode: StatusCodes.Status401Unauthorized);
                     // The signInManager already produced the needed response in the form of a cookie or bearer token.
-                    return TypedResults.Empty;
+                    return TypedResults.Ok();
                 })
             .WithTags("Authentication")
             .WithName("SignIn")
