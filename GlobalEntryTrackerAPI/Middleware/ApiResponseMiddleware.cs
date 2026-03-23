@@ -34,24 +34,30 @@ public class ApiResponseMiddleware(RequestDelegate next, ILogger<ApiResponseMidd
                 responseBody.Seek(0, SeekOrigin.Begin);
                 var bodyText = await new StreamReader(responseBody).ReadToEndAsync();
 
-                ApiResponse<object?> wrappedResponse;
+                // Only wrap application/json responses — pass through text/plain, etc. as-is
+                var contentType = context.Response.ContentType ?? string.Empty;
+                if (!contentType.Contains("application/json", StringComparison.OrdinalIgnoreCase))
+                {
+                    responseBody.Seek(0, SeekOrigin.Begin);
+                    await responseBody.CopyToAsync(originalBodyStream);
+                    return;
+                }
 
                 string wrappedResponseJson;
                 if (string.IsNullOrWhiteSpace(bodyText))
                 {
-                    // Handle empty or null response
                     wrappedResponseJson =
                         JsonSerializer.Serialize(new ApiResponse<object>(), options);
                 }
                 else
                 {
-                    // Handle non-empty response
                     var responseData = JsonSerializer.Deserialize<object?>(bodyText);
                     wrappedResponseJson =
                         JsonSerializer.Serialize(new ApiResponse<object?>(responseData), options);
                 }
 
                 context.Response.ContentType = "application/json";
+                context.Response.Headers.ContentLength = null;
                 await context.Response.WriteAsync(wrappedResponseJson);
             }
             else

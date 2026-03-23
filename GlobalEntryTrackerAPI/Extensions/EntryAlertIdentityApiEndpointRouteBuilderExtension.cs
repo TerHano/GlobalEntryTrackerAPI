@@ -54,11 +54,6 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
         var timeProvider = endpoints.ServiceProvider.GetRequiredService<TimeProvider>();
         var bearerTokenOptions = endpoints.ServiceProvider
             .GetRequiredService<IOptionsMonitor<BearerTokenOptions>>();
-        var emailSender = endpoints.ServiceProvider.GetRequiredService<IEmailSender<TUser>>();
-        var linkGenerator = endpoints.ServiceProvider.GetRequiredService<LinkGenerator>();
-
-        // We'll figure out a unique endpoint name based on the final route pattern during endpoint generation.
-        string? confirmEmailEndpointName = null;
 
         var routeGroup = endpoints.MapGroup("/api/auth/v1/");
 
@@ -142,7 +137,7 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
                     if (!result.Succeeded)
                     {
                         if (result.IsNotAllowed)
-                            throw new IncorrectLoginInformationException(
+                            throw new EmailNotConfirmedException(
                                 "Please confirm your email before logging in. Check your inbox for the confirmation email.");
 
                         throw new IncorrectLoginInformationException("Wrong email or password.");
@@ -194,49 +189,44 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
             });
 
         routeGroup.MapGet("/confirmEmail",
-                async Task<Results<ContentHttpResult, UnauthorizedHttpResult>>
-                ([FromQuery] string userId, [FromQuery] string code,
-                    [FromQuery] string? changedEmail, [FromServices] IServiceProvider sp) =>
-                {
-                    var userManager = sp.GetRequiredService<UserManager<TUser>>();
-                    if (await userManager.FindByIdAsync(userId) is not { } user)
-                        // We could respond with a 404 instead of a 401 like Identity UI, but that feels like unnecessary information.
-                        return TypedResults.Unauthorized();
-
-                    try
-                    {
-                        code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(code));
-                    }
-                    catch (FormatException)
-                    {
-                        return TypedResults.Unauthorized();
-                    }
-
-                    IdentityResult result;
-
-                    if (string.IsNullOrEmpty(changedEmail))
-                    {
-                        result = await userManager.ConfirmEmailAsync(user, code);
-                    }
-                    else
-                    {
-                        // As with Identity UI, email and user name are one and the same. So when we update the email,
-                        // we need to update the user name.
-                        result = await userManager.ChangeEmailAsync(user, changedEmail, code);
-
-                        if (result.Succeeded)
-                            result = await userManager.SetUserNameAsync(user, changedEmail);
-                    }
-
-                    if (!result.Succeeded) return TypedResults.Unauthorized();
-
-                    return TypedResults.Text("Thank you for confirming your email.");
-                })
-            .Add(endpointBuilder =>
+            async Task<Results<Ok, UnauthorizedHttpResult>>
+            ([FromQuery] string userId, [FromQuery] string code,
+                [FromQuery] string? changedEmail, [FromServices] IServiceProvider sp) =>
             {
-                var finalPattern = ((RouteEndpointBuilder)endpointBuilder).RoutePattern.RawText;
-                confirmEmailEndpointName = $"{nameof(MapEntryAlertIdentityApi)}-{finalPattern}";
-                endpointBuilder.Metadata.Add(new EndpointNameMetadata(confirmEmailEndpointName));
+                var userManager = sp.GetRequiredService<UserManager<TUser>>();
+                if (await userManager.FindByIdAsync(userId) is not { } user)
+                    return TypedResults.Unauthorized();
+
+                try
+                {
+                    code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(code));
+                }
+                catch (FormatException)
+                {
+                    return TypedResults.Unauthorized();
+                }
+
+                IdentityResult result;
+
+                if (string.IsNullOrEmpty(changedEmail))
+                {
+                    result = await userManager.ConfirmEmailAsync(user, code);
+                }
+                else
+                {
+                    result = await userManager.ChangeEmailAsync(user, changedEmail, code);
+
+                    if (result.Succeeded)
+                        result = await userManager.SetUserNameAsync(user, changedEmail);
+                }
+
+                if (!result.Succeeded) return TypedResults.Unauthorized();
+
+                // Sign in the user and set auth cookie
+                var signInManager = sp.GetRequiredService<SignInManager<TUser>>();
+                await signInManager.SignInAsync(user, true);
+
+                return TypedResults.Ok();
             });
 
         routeGroup.MapPost("/verify-email",
@@ -302,6 +292,7 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
                 var code = await userManager.GeneratePasswordResetTokenAsync(user);
                 code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
 
+                var emailSender = sp.GetRequiredService<IEmailSender<TUser>>();
                 await emailSender.SendPasswordResetCodeAsync(user, resetRequest.Email,
                     HtmlEncoder.Default.Encode(code));
             }
@@ -464,32 +455,35 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
         async Task SendConfirmationEmailAsync(TUser user, UserManager<TUser> userManager,
             HttpContext context, string email, bool isChange = false)
         {
-            if (confirmEmailEndpointName is null)
-                throw new NotSupportedException("No email confirmation endpoint was registered!");
-
             var code = isChange
                 ? await userManager.GenerateChangeEmailTokenAsync(user, email)
                 : await userManager.GenerateEmailConfirmationTokenAsync(user);
             code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
 
             var userId = await userManager.GetUserIdAsync(user);
-            var routeValues = new RouteValueDictionary
+
+            var configuration = context.RequestServices.GetRequiredService<IConfiguration>();
+            var frontendBaseUrl = configuration.GetValue<string>("Frontend:Base_Url")
+                                  ?? throw new NotSupportedException(
+                                      "Frontend:Base_Url is not configured.");
+            var frontEndConfirmEmailEndpoint =
+                configuration.GetValue("Frontend:Confirm_Email_Endpoint", "/confirm-email");
+
+            var queryParams = new Dictionary<string, string?>
             {
                 ["userId"] = userId,
-                ["code"] = code
+                ["code"] = code,
+                ["email"] = email
             };
-
             if (isChange)
-                // This is validated by the /confirmEmail endpoint on change.
-                routeValues.Add("changedEmail", email);
+                queryParams["changedEmail"] = email;
 
             var confirmEmailUrl =
-                linkGenerator.GetUriByName(context, confirmEmailEndpointName, routeValues)
-                ?? throw new NotSupportedException(
-                    $"Could not find endpoint named '{confirmEmailEndpointName}'.");
+                QueryHelpers.AddQueryString($"{frontendBaseUrl}{frontEndConfirmEmailEndpoint}",
+                    queryParams);
 
-            await emailSender.SendConfirmationLinkAsync(user, email,
-                HtmlEncoder.Default.Encode(confirmEmailUrl));
+            var emailSender = context.RequestServices.GetRequiredService<IEmailSender<TUser>>();
+            await emailSender.SendConfirmationLinkAsync(user, email, confirmEmailUrl);
         }
 
         return new IdentityEndpointsConventionBuilder(routeGroup);

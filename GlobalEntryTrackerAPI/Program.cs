@@ -55,7 +55,7 @@ if (string.IsNullOrEmpty(resendApiToken))
 builder.Services.AddOptions();
 builder.Services.AddHttpClient<ResendClient>();
 builder.Services.Configure<ResendClientOptions>(o => { o.ApiToken = resendApiToken; });
-builder.Services.AddTransient<IResend, ResendClient>();
+builder.Services.AddScoped<IResend, ResendClient>();
 
 const string globalEntryTrackerPolicy = "GlobalEntryTrackerPolicy";
 var allowedOriginsConfig = builder.Configuration.GetValue<string>("Allowed_Origins");
@@ -158,7 +158,7 @@ builder.Services.AddTransient<SmtpClient>(serviceProvider =>
     };
 });
 
-builder.Services.AddTransient<IEmailSender<UserEntity>, ResendEmailSender>();
+builder.Services.AddScoped<IEmailSender<UserEntity>, ResendEmailSender>();
 
 builder.Services.AddHttpClient();
 
