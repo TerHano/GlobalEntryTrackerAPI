@@ -45,6 +45,10 @@ services:
       - AWS__Access_Key=${AWS__ACCESS_KEY}
       - AWS__Secret_Key=${AWS__SECRET_KEY}
       - Stripe__Admin_Grant_Coupon_Id={STRIPE__ADMIN_GRANT_COUPON_ID}
+      - Resend__Api_Key=${RESEND__API_KEY}
+      - Frontend__Base_Url=${FRONTEND__BASE_URL}
+      - Frontend__Confirm_Email_Endpoint=${FRONTEND__CONFIRM_EMAIL_ENDPOINT}
+      - Frontend__Reset_Password_Endpoint=${FRONTEND__RESET_PASSWORD_ENDPOINT}
     networks:
       - globalentrytracker_dev
   globalentrytracker_db:

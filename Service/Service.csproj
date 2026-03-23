@@ -7,14 +7,21 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Database\Database.csproj"/>
+        <ProjectReference Include="..\Database\Database.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="AWSSDK.SimpleEmail" Version="4.0.0.15"/>
+        <Content Include="EmailTemplates\*.html">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="AWSSDK.SimpleEmail" Version="4.0.0.15" />
         <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.13" />
         <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="9.0.13" />
-        <PackageReference Include="Quartz.AspNetCore" Version="3.14.0"/>
+        <PackageReference Include="Quartz.AspNetCore" Version="3.14.0" />
+        <PackageReference Include="Resend" Version="0.2.2" />
     </ItemGroup>
 
 </Project>
