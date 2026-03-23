@@ -12,13 +12,13 @@ using GlobalEntryTrackerAPI.Endpoints.Webhooks;
 using GlobalEntryTrackerAPI.Extensions;
 using GlobalEntryTrackerAPI.Jobs;
 using GlobalEntryTrackerAPI.Middleware;
+using GlobalEntryTrackerAPI.Util;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Quartz;
 using Quartz.AspNetCore;
-using Resend;
 using Serilog;
 using Service;
 using Service.Jobs;
@@ -34,28 +34,19 @@ builder.Host.UseSerilog((context, services, configuration) =>
         .ReadFrom.Services(services)
         .Enrich.FromLogContext()
         .WriteTo.Console(
-            outputTemplate:
-            "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}"
+            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}"
         );
 
     if (context.HostingEnvironment.IsDevelopment())
+    {
         logConfig.WriteTo.File(
-            "logs/log-.txt",
+            path: "logs/log-.txt",
             rollingInterval: RollingInterval.Day,
             retainedFileCountLimit: 30,
-            outputTemplate:
-            "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}"
+            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}"
         );
+    }
 });
-
-
-var resendApiToken = builder.Configuration.GetValue<string>("Resend:Api_Key");
-if (string.IsNullOrEmpty(resendApiToken))
-    throw new Exception("Resend API key is missing in configuration.");
-builder.Services.AddOptions();
-builder.Services.AddHttpClient<ResendClient>();
-builder.Services.Configure<ResendClientOptions>(o => { o.ApiToken = resendApiToken; });
-builder.Services.AddScoped<IResend, ResendClient>();
 
 const string globalEntryTrackerPolicy = "GlobalEntryTrackerPolicy";
 var allowedOriginsConfig = builder.Configuration.GetValue<string>("Allowed_Origins");
@@ -158,7 +149,7 @@ builder.Services.AddTransient<SmtpClient>(serviceProvider =>
     };
 });
 
-builder.Services.AddScoped<IEmailSender<UserEntity>, ResendEmailSender>();
+builder.Services.AddTransient<IEmailSender<UserEntity>, AwsEmailSender>();
 
 builder.Services.AddHttpClient();
 
@@ -235,7 +226,9 @@ builder.Services.AddQuartz(q =>
 });
 
 builder.Services.AddAuthorizationBuilder()
-    .AddPolicy("Admin", policy => policy.RequireRole("Admin"));
+    .AddPolicy("Admin", policy => policy.RequireRole("Admin"))
+    .AddPolicy("PaidOrAdmin",
+        policy => policy.RequireRole("Subscriber", "Admin", "FriendsFamily"));
 
 builder.Services.AddQuartzServer(options =>
 {
@@ -260,8 +253,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 builder.Services.AddIdentityApiEndpoints<UserEntity>(op =>
     {
-        op.SignIn.RequireConfirmedEmail = true;
-        op.Tokens.PasswordResetTokenProvider = TokenOptions.DefaultEmailProvider; // add this
+        op.SignIn.RequireConfirmedEmail = false;
     })
     .AddRoles<RoleEntity>()
     .AddEntityFrameworkStores<GlobalEntryTrackerDbContext>()
