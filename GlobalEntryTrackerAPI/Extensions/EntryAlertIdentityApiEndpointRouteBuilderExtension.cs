@@ -5,7 +5,6 @@ using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 using System.Security.Claims;
 using System.Text;
-using System.Text.Encodings.Web;
 using Business;
 using Business.Dto.Requests;
 using Business.Exceptions;
@@ -282,55 +281,91 @@ public static class EntryAlertIdentityApiEndpointRouteBuilderExtension
         });
 
         routeGroup.MapPost("/forgotPassword", async Task<Results<Ok, ValidationProblem>>
-            ([FromBody] ForgotPasswordRequest resetRequest, [FromServices] IServiceProvider sp) =>
-        {
-            var userManager = sp.GetRequiredService<UserManager<TUser>>();
-            var user = await userManager.FindByEmailAsync(resetRequest.Email);
-
-            if (user is not null && await userManager.IsEmailConfirmedAsync(user))
+            ([FromBody] ForgotPasswordRequest resetRequest,
+                [FromServices] IServiceProvider sp) =>
             {
-                var code = await userManager.GeneratePasswordResetTokenAsync(user);
-                code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+                var userManager = sp.GetRequiredService<UserManager<TUser>>();
+                var user = await userManager.FindByEmailAsync(resetRequest.Email);
 
-                var emailSender = sp.GetRequiredService<IEmailSender<TUser>>();
-                await emailSender.SendPasswordResetCodeAsync(user, resetRequest.Email,
-                    HtmlEncoder.Default.Encode(code));
-            }
+                if (user is not null && await userManager.IsEmailConfirmedAsync(user))
+                {
+                    var code = await userManager.GeneratePasswordResetTokenAsync(user);
+                    code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
 
-            // Don't reveal that the user does not exist or is not confirmed, so don't return a 200 if we would have
-            // returned a 400 for an invalid code given a valid user email.
-            return TypedResults.Ok();
-        });
+                    var emailSender = sp.GetRequiredService<IEmailSender<TUser>>();
 
-        routeGroup.MapPost("/resetPassword", async Task<Results<Ok, ValidationProblem>>
-            ([FromBody] ResetPasswordRequest resetRequest, [FromServices] IServiceProvider sp) =>
-        {
-            var userManager = sp.GetRequiredService<UserManager<TUser>>();
+                    var frontendBaseUrl = sp.GetRequiredService<IConfiguration>()
+                                              .GetValue<string>("Frontend:Base_Url")
+                                          ?? throw new NotSupportedException(
+                                              "Frontend:Base_Url is not configured.");
+                    var frontEndResetPasswordEndpoint =
+                        sp.GetRequiredService<IConfiguration>()
+                            .GetValue("Frontend:Reset_Password_Endpoint", "/reset-password");
+                    var resetPasswordUrl = QueryHelpers.AddQueryString(
+                        $"{frontendBaseUrl}{frontEndResetPasswordEndpoint}",
+                        new Dictionary<string, string?>
+                        {
+                            ["email"] = resetRequest.Email,
+                            ["code"] = code
+                        });
 
-            var user = await userManager.FindByEmailAsync(resetRequest.Email);
+                    await emailSender.SendPasswordResetLinkAsync(user, resetRequest.Email,
+                        resetPasswordUrl);
+                }
 
-            if (user is null || !await userManager.IsEmailConfirmedAsync(user))
                 // Don't reveal that the user does not exist or is not confirmed, so don't return a 200 if we would have
                 // returned a 400 for an invalid code given a valid user email.
-                return CreateValidationProblem(
-                    IdentityResult.Failed(userManager.ErrorDescriber.InvalidToken()));
+                return TypedResults.Ok();
+            })
+            .WithTags("Authentication")
+            .WithName("ForgotPassword")
+            .WithSummary("Initiate a password reset request")
+            .WithDescription(
+                "Sends a password reset email to the user with the provided email address if it exists and is confirmed. The email contains a reset code and a link to reset the password. To reset the password, make a /resetPassword request with the email, reset code, and new password.")
+            .Accepts<ForgotPasswordRequest>("application/json")
+            .Produces<ApiResponse<object>>()
+            .Produces<ApiResponse<object>>(StatusCodes.Status400BadRequest);
 
-            IdentityResult result;
-            try
+        routeGroup.MapPost("/resetPassword", async Task<Results<Ok, ValidationProblem>>
+            ([FromBody] ResetPasswordRequest resetRequest,
+                [FromServices] IServiceProvider sp) =>
             {
-                var code =
-                    Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(resetRequest.ResetCode));
-                result = await userManager.ResetPasswordAsync(user, code, resetRequest.NewPassword);
-            }
-            catch (FormatException)
-            {
-                result = IdentityResult.Failed(userManager.ErrorDescriber.InvalidToken());
-            }
+                var userManager = sp.GetRequiredService<UserManager<TUser>>();
 
-            if (!result.Succeeded) return CreateValidationProblem(result);
+                var user = await userManager.FindByEmailAsync(resetRequest.Email);
 
-            return TypedResults.Ok();
-        });
+                if (user is null || !await userManager.IsEmailConfirmedAsync(user))
+                    // Don't reveal that the user does not exist or is not confirmed, so don't return a 200 if we would have
+                    // returned a 400 for an invalid code given a valid user email.
+                    return CreateValidationProblem(
+                        IdentityResult.Failed(userManager.ErrorDescriber.InvalidToken()));
+
+                IdentityResult result;
+                try
+                {
+                    var code =
+                        Encoding.UTF8.GetString(
+                            WebEncoders.Base64UrlDecode(resetRequest.ResetCode));
+                    result = await userManager.ResetPasswordAsync(user, code,
+                        resetRequest.NewPassword);
+                }
+                catch (FormatException)
+                {
+                    result = IdentityResult.Failed(userManager.ErrorDescriber.InvalidToken());
+                }
+
+                if (!result.Succeeded) return CreateValidationProblem(result);
+
+                return TypedResults.Ok();
+            })
+            .WithTags("Authentication")
+            .WithName("ResetPassword")
+            .WithSummary("Reset a user's password")
+            .WithDescription(
+                "Resets the user's password using the provided reset code. To get a reset code, first make a /forgotPassword request with the user's email to receive the reset code in an email.")
+            .Produces<ApiResponse<object>>()
+            .Produces<ApiResponse<object>>(StatusCodes.Status400BadRequest);
+
 
         var accountGroup = routeGroup.MapGroup("/manage").RequireAuthorization();
 
