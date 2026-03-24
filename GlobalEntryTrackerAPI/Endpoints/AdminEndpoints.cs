@@ -134,6 +134,22 @@ public static class AdminEndpoints
             .Produces<ApiResponse<object>>(StatusCodes.Status401Unauthorized)
             .Produces<ApiResponse<object>>(StatusCodes.Status403Forbidden);
 
+        app.MapPost("/api/v1/admin/downgrade-to-free/{userId}",
+                async (string userId, SubscriptionBusiness subscriptionBusiness) =>
+                {
+                    await subscriptionBusiness.DowngradeUserToFree(userId);
+                    return Results.Ok();
+                })
+            .RequireAuthorization("Admin")
+            .WithTags("Admin")
+            .WithName("DowngradeUserToFree")
+            .WithSummary("Downgrade a user to the free plan")
+            .WithDescription(
+                "Cancels the user's Stripe subscription and assigns them the Free role. Requires Admin authorization.")
+            .Produces<ApiResponse<object>>()
+            .Produces<ApiResponse<object>>(StatusCodes.Status401Unauthorized)
+            .Produces<ApiResponse<object>>(StatusCodes.Status403Forbidden);
+
         app.MapPost("/api/v1/admin/sync-subscription-role/{userId}",
                 async (string userId, SubscriptionBusiness subscriptionBusiness) =>
                 {

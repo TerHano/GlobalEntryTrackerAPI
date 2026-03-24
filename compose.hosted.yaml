@@ -41,10 +41,9 @@ services:
       - Database__Name=${DATABASE__NAME}
       - Database__Server=globalentrytracker_db
       - Database__Port=5432
-      - Email__Enabled={EMAIL__ENABLED}
       - AWS__Access_Key=${AWS__ACCESS_KEY}
       - AWS__Secret_Key=${AWS__SECRET_KEY}
-      - Stripe__Admin_Grant_Coupon_Id={STRIPE__ADMIN_GRANT_COUPON_ID}
+      - Stripe__Admin_Grant_Coupon_Id=${STRIPE__ADMIN_GRANT_COUPON_ID}
       - Resend__Api_Key=${RESEND__API_KEY}
       - Frontend__Base_Url=${FRONTEND__BASE_URL}
       - Frontend__Confirm_Email_Endpoint=${FRONTEND__CONFIRM_EMAIL_ENDPOINT}

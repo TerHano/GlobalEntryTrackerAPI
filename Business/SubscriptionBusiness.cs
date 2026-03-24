@@ -664,6 +664,52 @@ public class SubscriptionBusiness(
         }
     }
 
+    public async Task DowngradeUserToFree(string userId)
+    {
+        var userCustomer = await userCustomerRepository.GetCustomerDetailsForUser(userId);
+
+        if (userCustomer != null && !string.IsNullOrWhiteSpace(userCustomer.SubscriptionId))
+        {
+            logger.LogInformation(
+                "Cancelling Stripe subscription {SubscriptionId} for user {UserId}",
+                userCustomer.SubscriptionId, userId);
+
+            try
+            {
+                var subscriptionService = new SubscriptionService();
+                await subscriptionService.CancelAsync(userCustomer.SubscriptionId);
+            }
+            catch (StripeException ex)
+            {
+                logger.LogError(ex,
+                    "Stripe API error when cancelling subscription {SubscriptionId} for user {UserId}",
+                    userCustomer.SubscriptionId, userId);
+                throw;
+            }
+
+            // Clear the subscription ID — the user no longer has an active subscription
+            await userCustomerRepository.AddEditUserCustomer(new UserCustomerEntity
+            {
+                UserId = userId,
+                CustomerId = userCustomer.CustomerId,
+                SubscriptionId = null
+            });
+        }
+        else
+        {
+            logger.LogInformation(
+                "No active Stripe subscription found for user {UserId} — skipping cancellation",
+                userId);
+        }
+
+        // CustomerSubscriptionDeleted webhook will also fire and remove the role,
+        // but we remove it here too so the downgrade is immediate.
+        await userRoleRepository.RemoveRoleForUser(userId, Role.Subscriber);
+        await userRoleRepository.AddEditRoleForUser(userId, Role.Free);
+
+        logger.LogInformation("User {UserId} has been downgraded to Free", userId);
+    }
+
     public async Task<SyncSubscriptionRolesResult> SyncAllUserSubscriptionRoles()
     {
         var userIds = await userProfileRepository.GetAllUserIds();
