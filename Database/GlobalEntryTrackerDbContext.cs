@@ -28,6 +28,8 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
 
     public DbSet<StripeWebhookEventEntity> StripeWebhookEvents { get; set; }
 
+    public DbSet<SeenAppointmentEntity> SeenAppointments { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -55,12 +57,23 @@ public class GlobalEntryTrackerDbContext(DbContextOptions<GlobalEntryTrackerDbCo
             .HasOne(e => e.EmailNotificationSettings)
             .WithOne(e => e.UserNotification);
 
+        // Must be a SQL default, not HasDefaultValue(DateTime.UtcNow): the latter bakes the moment
+        // the model was built into the schema, so every new migration rewrites this column's default.
         modelBuilder.Entity<UserProfileEntity>().Property(u => u.NextNotificationAt)
-            .HasDefaultValue(DateTime.UtcNow);
+            .HasDefaultValueSql("(now() at time zone 'utc')");
 
 
         modelBuilder.Entity<UserCustomerEntity>()
             .HasOne(e => e.User);
+
+        modelBuilder.Entity<SeenAppointmentEntity>()
+            .HasOne(e => e.Location)
+            .WithMany()
+            .HasForeignKey(e => e.LocationId);
+
+        modelBuilder.Entity<SeenAppointmentEntity>()
+            .HasIndex(e => new { e.LocationId, e.StartTimestamp })
+            .IsUnique();
 
         modelBuilder.Entity<StripeWebhookEventEntity>()
             .HasIndex(e => e.EventId)

@@ -9,6 +9,13 @@ namespace GlobalEntryTrackerAPI.Middleware;
 
 public class ApiResponseMiddleware(RequestDelegate next, ILogger<ApiResponseMiddleware> logger)
 {
+    // Static so the serializer's per-options metadata cache is actually reused; a fresh instance
+    // per request defeats it. Not indented: this is wire format, not something a human reads.
+    private static readonly JsonSerializerOptions SerializerOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     public async Task InvokeAsync(HttpContext context)
     {
         if (context.Response.HasStarted)
@@ -17,12 +24,6 @@ public class ApiResponseMiddleware(RequestDelegate next, ILogger<ApiResponseMidd
         var originalBodyStream = context.Response.Body;
         using var responseBody = new MemoryStream();
         context.Response.Body = responseBody;
-
-        var options = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true
-        };
 
         try
         {
@@ -48,13 +49,13 @@ public class ApiResponseMiddleware(RequestDelegate next, ILogger<ApiResponseMidd
                 if (string.IsNullOrWhiteSpace(bodyText))
                 {
                     wrappedResponseJson =
-                        JsonSerializer.Serialize(new ApiResponse<object>(), options);
+                        JsonSerializer.Serialize(new ApiResponse<object>(), SerializerOptions);
                 }
                 else
                 {
                     var responseData = JsonSerializer.Deserialize<object?>(bodyText);
                     wrappedResponseJson =
-                        JsonSerializer.Serialize(new ApiResponse<object?>(responseData), options);
+                        JsonSerializer.Serialize(new ApiResponse<object?>(responseData), SerializerOptions);
                 }
 
                 context.Response.ContentType = "application/json";
@@ -108,7 +109,27 @@ public class ApiResponseMiddleware(RequestDelegate next, ILogger<ApiResponseMidd
                             }
                         ]
                     };
-                    context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                    // These describe something the caller did or a state they can resolve, so they
+                    // carry their own 4xx rather than being reported as a server fault.
+                    context.Response.StatusCode = (int)baseApplicationException.StatusCode;
+                }
+                else if (ex is UnauthorizedAccessException)
+                {
+                    response = new ApiResponse<object?>
+                    {
+                        Success = false,
+                        Errors =
+                        [
+                            new Error
+                            {
+                                Code = ExceptionCode.GenericError,
+                                // Deliberately vague: the caller should not learn whether the
+                                // resource exists, only that it is not theirs.
+                                Message = "You are not authorized to perform this action."
+                            }
+                        ]
+                    };
+                    context.Response.StatusCode = (int)HttpStatusCode.Forbidden;
                 }
                 else
                 {
@@ -129,7 +150,7 @@ public class ApiResponseMiddleware(RequestDelegate next, ILogger<ApiResponseMidd
 
                 context.Response.ContentType = "application/json";
 
-                var responseJson = JsonSerializer.Serialize(response, options);
+                var responseJson = JsonSerializer.Serialize(response, SerializerOptions);
                 logger.LogError(ex, "An error occurred while processing the request.");
                 await context.Response.WriteAsync(responseJson);
             }

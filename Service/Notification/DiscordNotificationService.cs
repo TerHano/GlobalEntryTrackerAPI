@@ -21,7 +21,7 @@ public class DiscordNotificationService(
 
     public async Task SendNotification<T>(
         List<LocationAppointmentDto> appointments, AppointmentLocationEntity locationInformation,
-        T userNotificationSettings)
+        T userNotificationSettings, NotificationDeliveryContext deliveryContext)
     {
         if (userNotificationSettings is null ||
             userNotificationSettings is not DiscordNotificationSettingsEntity
@@ -33,7 +33,8 @@ public class DiscordNotificationService(
 
         if (discordNotificationSettings is { Enabled: true })
         {
-            var message = GenerateDiscordMessageFromAppointment(appointments, locationInformation);
+            var message = GenerateDiscordMessageFromAppointment(appointments, locationInformation,
+                deliveryContext);
             await SendMessageThroughWebhook(discordNotificationSettings, message);
         }
     }
@@ -137,8 +138,18 @@ public class DiscordNotificationService(
     }
 
     private DiscordWebhookMessageDto GenerateDiscordMessageFromAppointment(
-        List<LocationAppointmentDto> appointments, AppointmentLocationEntity locationInformation)
+        List<LocationAppointmentDto> appointments, AppointmentLocationEntity locationInformation,
+        NotificationDeliveryContext deliveryContext)
     {
+        var fields = GetAvailableAppointmentFields(appointments, locationInformation);
+
+        if (deliveryContext.IsDelayed)
+            fields.Add(new DiscordWebhookMessageDto.Field
+            {
+                Name = $"⏳ Sent {deliveryContext.DelayInMinutes} minutes late",
+                Value = BuildUpgradeMessage(deliveryContext)
+            });
+
         var discordMessage = new DiscordWebhookMessageDto
         {
             Username = "Global Entry Alert Bot",
@@ -150,11 +161,21 @@ public class DiscordNotificationService(
                     Description =
                         "Click [here](https://ttp.cbp.dhs.gov/dashboard) to schedule your appointment",
                     Color = 16761600,
-                    Fields =
-                        GetAvailableAppointmentFields(appointments, locationInformation)
+                    Fields = fields
                 }
             ]
         };
         return discordMessage;
+    }
+
+    private static string BuildUpgradeMessage(NotificationDeliveryContext deliveryContext)
+    {
+        var message =
+            $"Your plan holds alerts for {deliveryContext.DelayInMinutes} minutes, so these " +
+            "appointments have already been available to subscribers. Subscribers are alerted the " +
+            "moment an appointment appears.";
+        return deliveryContext.UpgradeUrl == null
+            ? message
+            : $"{message} [Upgrade for instant alerts]({deliveryContext.UpgradeUrl})";
     }
 }

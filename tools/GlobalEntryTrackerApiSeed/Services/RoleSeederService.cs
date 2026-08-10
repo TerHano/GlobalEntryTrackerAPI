@@ -83,12 +83,14 @@ public class RoleSeederService(
 
     private static List<RoleEntity> GetRoles()
     {
+        // Arguments: name, code, maxTrackers, notificationIntervalInMinutes (cooldown),
+        // notificationDelayInMinutes (how long a slot is withheld from this role).
         return
         [
-            new RoleEntity(nameof(Role.Free), Role.Free.GetCode(), 2, 300),
-            new RoleEntity(nameof(Role.Subscriber), Role.Subscriber.GetCode(), 5, 10),
-            new RoleEntity(nameof(Role.Admin), Role.Admin.GetCode(), 10, 1),
-            new RoleEntity(nameof(Role.FriendsFamily), Role.FriendsFamily.GetCode(), 10, 1)
+            new RoleEntity(nameof(Role.Free), Role.Free.GetCode(), 2, 120, 45),
+            new RoleEntity(nameof(Role.Subscriber), Role.Subscriber.GetCode(), 5, 10, 0),
+            new RoleEntity(nameof(Role.Admin), Role.Admin.GetCode(), 10, 1, 0),
+            new RoleEntity(nameof(Role.FriendsFamily), Role.FriendsFamily.GetCode(), 10, 1, 0)
         ];
     }
 }

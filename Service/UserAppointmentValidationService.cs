@@ -6,6 +6,35 @@ namespace Service;
 
 public class UserAppointmentValidationService
 {
+    /// <summary>
+    ///     Filters appointments down to those that have been visible long enough to be released to a
+    ///     given role. A delay of 0 releases everything immediately.
+    /// </summary>
+    /// <param name="locationAppointments">Appointments from the current scan.</param>
+    /// <param name="firstSeenByStart">Normalised slot start time to first-seen time.</param>
+    /// <param name="notificationDelayInMinutes">The role's delay.</param>
+    /// <param name="asOf">Current scan time.</param>
+    public List<LocationAppointmentDto> GetAppointmentsReleasedToRole(
+        List<LocationAppointmentDto> locationAppointments,
+        IReadOnlyDictionary<DateTime, DateTime> firstSeenByStart,
+        int notificationDelayInMinutes,
+        DateTime asOf)
+    {
+        if (notificationDelayInMinutes <= 0) return locationAppointments;
+
+        var releaseCutoff = asOf.AddMinutes(-notificationDelayInMinutes);
+        return locationAppointments
+            .Where(appointment =>
+            {
+                var key = SeenAppointmentEntity.NormalizeStart(appointment.StartTimestamp);
+                // A slot with no record has only just been observed, so it cannot yet have aged
+                // past the delay. Withhold it rather than leaking it early.
+                return firstSeenByStart.TryGetValue(key, out var firstSeenAt) &&
+                       firstSeenAt <= releaseCutoff;
+            })
+            .ToList();
+    }
+
     public List<LocationAppointmentDto> GetValidAppointmentsForUsers(
         List<LocationAppointmentDto> locationAppointments,
         TrackedLocationForUserEntity trackedLocationForUser)

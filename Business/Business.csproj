@@ -25,13 +25,10 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Stripe.net" Version="48.1.0"/>
-        <PackageReference Include="Supabase" Version="1.1.1"/>
     </ItemGroup>
 
     <ItemGroup>
-        <Reference Include="Microsoft.AspNetCore.Identity">
-            <HintPath>..\..\..\.dotnet\shared\Microsoft.AspNetCore.App\9.0.2\Microsoft.AspNetCore.Identity.dll</HintPath>
-        </Reference>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
     </ItemGroup>
 
 </Project>

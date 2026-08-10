@@ -74,7 +74,13 @@ public class UserProfileRepository(
         return users;
     }
 
-    public async Task UpdateMultipleUserProfiles(List<UserProfileEntity> users)
+    /// <summary>
+    ///     Persists the notification cooldown for a set of user profiles.
+    ///     <see cref="UserProfileEntity.NextNotificationAt" /> is an internal, role-derived value and is
+    ///     never supplied by a user, so this deliberately marks only that column as modified. Any other
+    ///     in-memory changes on the supplied entities are ignored.
+    /// </summary>
+    public async Task UpdateNextNotificationTimes(List<UserProfileEntity> users)
     {
         try
         {
@@ -82,11 +88,8 @@ public class UserProfileRepository(
             foreach (var user in users)
             {
                 if (user is null) throw new NullReferenceException("User does not exist");
-                // Attach the entity and mark only the properties we want to update
                 var entry = context.UserProfiles.Attach(user);
-                entry.Property(x => x.Email).IsModified = true;
-                entry.Property(x => x.FirstName).IsModified = true;
-                entry.Property(x => x.LastName).IsModified = true;
+                entry.Property(x => x.NextNotificationAt).IsModified = true;
             }
 
             await context.SaveChangesAsync();
@@ -94,7 +97,7 @@ public class UserProfileRepository(
         catch (DbUpdateException ex)
         {
             logger.LogError(ex.Message);
-            throw new DbUpdateException("Failed to update users", ex);
+            throw new DbUpdateException("Failed to update next notification times", ex);
         }
     }
 

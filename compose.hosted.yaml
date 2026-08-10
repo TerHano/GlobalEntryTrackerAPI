@@ -48,6 +48,7 @@ services:
       - Frontend__Base_Url=${FRONTEND__BASE_URL}
       - Frontend__Confirm_Email_Endpoint=${FRONTEND__CONFIRM_EMAIL_ENDPOINT}
       - Frontend__Reset_Password_Endpoint=${FRONTEND__RESET_PASSWORD_ENDPOINT}
+      - Frontend__Upgrade_Endpoint=${FRONTEND__UPGRADE_ENDPOINT}
     networks:
       - globalentrytracker_dev
   globalentrytracker_db:

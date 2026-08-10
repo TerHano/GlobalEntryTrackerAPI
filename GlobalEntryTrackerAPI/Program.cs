@@ -102,6 +102,7 @@ builder.Services.AddDbContextFactory<GlobalEntryTrackerDbContext>(opt =>
 });
 
 builder.Services.AddMemoryCache();
+builder.Services.AddHealthChecks();
 
 builder.Services.AddScoped<AppointmentLocationRepository>();
 builder.Services.AddScoped<TrackedLocationForUserRepository>();
@@ -114,6 +115,7 @@ builder.Services.AddScoped<PlanOptionRepository>();
 builder.Services.AddScoped<UserNotificationRepository>();
 builder.Services.AddScoped<ArchivedAppointmentsRepository>();
 builder.Services.AddScoped<RoleRepository>();
+builder.Services.AddScoped<SeenAppointmentRepository>();
 
 
 //builder.Services.AddScoped<JwtService>();
@@ -282,6 +284,9 @@ app.UseMiddleware<ApiResponseMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// The container restarts on `restart: always`, so a wedged process needs something to fail against.
+app.MapHealthChecks("/health").AllowAnonymous();
 
 app.MapLocationEndpoints();
 app.MapLocationTrackerEndpoints();

@@ -15,7 +15,8 @@ public class NotificationManagerService(
 {
     public async Task SendAppointmentAvailableNotifications(
         List<LocationAppointmentDto> locationAppointments,
-        AppointmentLocationEntity appointmentLocation, string userId)
+        AppointmentLocationEntity appointmentLocation, string userId,
+        NotificationDeliveryContext deliveryContext)
     {
         var userNotification =
             await userNotificationRepository.GetUserWithNotificationSettings(userId);
@@ -32,13 +33,13 @@ public class NotificationManagerService(
             notificationTasks.Add(
                 SendNotificationForService(
                     NotificationServiceType.Discord, locationAppointments,
-                    appointmentLocation, discordSettings));
+                    appointmentLocation, discordSettings, deliveryContext));
 
         if (emailAllowed)
             notificationTasks.Add(
                 SendNotificationForService(NotificationServiceType.Email,
                     locationAppointments, appointmentLocation,
-                    userNotification.EmailNotificationSettings));
+                    userNotification.EmailNotificationSettings, deliveryContext));
 
         await Task.WhenAll(notificationTasks);
 
@@ -86,7 +87,8 @@ public class NotificationManagerService(
 
     private async Task SendNotificationForService<T>(NotificationServiceType serviceType,
         List<LocationAppointmentDto> locationAppointments,
-        AppointmentLocationEntity locationInformation, T userNotificationSettings)
+        AppointmentLocationEntity locationInformation, T userNotificationSettings,
+        NotificationDeliveryContext deliveryContext)
     {
         var service = GetNotificationInstanceForService(serviceType);
         if (service == null)
@@ -96,7 +98,7 @@ public class NotificationManagerService(
         }
 
         await service.SendNotification(locationAppointments, locationInformation,
-            userNotificationSettings);
+            userNotificationSettings, deliveryContext);
     }
 
     private INotificationService? GetNotificationInstanceForService(
