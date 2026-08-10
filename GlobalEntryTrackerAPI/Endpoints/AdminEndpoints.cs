@@ -121,6 +121,8 @@ public static class AdminEndpoints
                 async (SubscriptionBusiness subscriptionBusiness,
                     GrantSubscriptionRequest request) =>
                 {
+                    var validator = new GrantSubscriptionRequestValidator();
+                    await validator.ValidateAndThrowAsync(request);
                     await subscriptionBusiness.GrantSubscriptionToUser(request);
                     return Results.Ok();
                 })

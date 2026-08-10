@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Mail;
 using System.Text;
 using Database.Entities;
@@ -24,7 +25,8 @@ public class EmailNotificationService(
     }
 
     public async Task SendNotification<T>(List<LocationAppointmentDto> appointments,
-        AppointmentLocationEntity locationInformation, T emailNotificationSettings)
+        AppointmentLocationEntity locationInformation, T emailNotificationSettings,
+        NotificationDeliveryContext deliveryContext)
     {
         if (emailNotificationSettings is not EmailNotificationSettingsEntity
             emailNotificationSettingsEntity)
@@ -35,16 +37,18 @@ public class EmailNotificationService(
 
         var userEmail = emailNotificationSettingsEntity.Email;
         var message =
-            GenerateEmailMessageFromAppointment(appointments, locationInformation, userEmail);
+            GenerateEmailMessageFromAppointment(appointments, locationInformation, userEmail,
+                deliveryContext);
         await smtpClient.SendMailAsync(message);
     }
 
     private MailMessage GenerateEmailMessageFromAppointment(
         List<LocationAppointmentDto> appointments,
         AppointmentLocationEntity locationInformation,
-        string userEmail)
+        string userEmail,
+        NotificationDeliveryContext deliveryContext)
     {
-        var body = GenerateEmailBody(appointments, locationInformation);
+        var body = GenerateEmailBody(appointments, locationInformation, deliveryContext);
         var message = GenerateEmailMessage(userEmail, "Available Appointments",
             body);
 
@@ -53,18 +57,43 @@ public class EmailNotificationService(
 
     private string GenerateEmailBody(
         List<LocationAppointmentDto> appointments,
-        AppointmentLocationEntity locationInformation)
+        AppointmentLocationEntity locationInformation,
+        NotificationDeliveryContext deliveryContext)
     {
         var body = new StringBuilder();
-        body.AppendLine($"<h1>Available Appointments for {locationInformation.Name}</h1>");
+        body.AppendLine(
+            $"<h1>Available Appointments for {WebUtility.HtmlEncode(locationInformation.Name)}</h1>");
         body.AppendLine("<ul>");
 
-        foreach (var appointment in appointments)
-            body.AppendLine($"<li>{appointment.StartTimestamp} - {appointment.EndTimestamp}</li>");
+        foreach (var appointmentsForDay in appointments.GroupBy(x => x.StartTimestamp.Date))
+        {
+            var times = string.Join(", ",
+                appointmentsForDay.Select(x => x.StartTimestamp.ToString("h:mm tt")));
+            body.AppendLine($"<li><strong>{appointmentsForDay.Key:MMM dd, yyyy}</strong>: {times}</li>");
+        }
 
         body.AppendLine("</ul>");
+        body.AppendLine(
+            "<p><a href=\"https://ttp.cbp.dhs.gov/dashboard\">Schedule your appointment</a></p>");
+        body.AppendLine(GenerateDelayNotice(deliveryContext));
 
         return body.ToString();
+    }
+
+    private static string GenerateDelayNotice(NotificationDeliveryContext deliveryContext)
+    {
+        if (!deliveryContext.IsDelayed) return string.Empty;
+
+        var notice = new StringBuilder();
+        notice.AppendLine("<hr />");
+        notice.AppendLine(
+            $"<p><strong>This alert was held for {deliveryContext.DelayInMinutes} minutes.</strong> " +
+            "Your plan delays appointment alerts, so subscribers have already seen these. " +
+            "Subscribers are alerted the moment an appointment appears.</p>");
+        if (deliveryContext.UpgradeUrl != null)
+            notice.AppendLine(
+                $"<p><a href=\"{WebUtility.HtmlEncode(deliveryContext.UpgradeUrl)}\">Upgrade for instant alerts</a></p>");
+        return notice.ToString();
     }
 
     private MailMessage GenerateEmailMessage(string to, string subject, string body)

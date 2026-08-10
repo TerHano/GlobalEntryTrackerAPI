@@ -243,6 +243,9 @@ namespace Database.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<int>("NotificationDelayInMinutes")
+                        .HasColumnType("integer");
+
                     b.Property<int>("NotificationIntervalInMinutes")
                         .HasColumnType("integer");
 
@@ -253,6 +256,31 @@ namespace Database.Migrations
                         .HasDatabaseName("RoleNameIndex");
 
                     b.ToTable("AspNetRoles", (string)null);
+                });
+
+            modelBuilder.Entity("Database.Entities.SeenAppointmentEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("FirstSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("LocationId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("StartTimestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LocationId", "StartTimestamp")
+                        .IsUnique();
+
+                    b.ToTable("SeenAppointments");
                 });
 
             modelBuilder.Entity("Database.Entities.StripeWebhookEventEntity", b =>
@@ -488,7 +516,7 @@ namespace Database.Migrations
                     b.Property<DateTime?>("NextNotificationAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValue(new DateTime(2026, 2, 26, 1, 42, 7, 336, DateTimeKind.Utc).AddTicks(3310));
+                        .HasDefaultValueSql("(now() at time zone 'utc')");
 
                     b.Property<string>("UserId")
                         .IsRequired()
@@ -609,6 +637,17 @@ namespace Database.Migrations
                 });
 
             modelBuilder.Entity("Database.Entities.ArchivedAppointmentEntity", b =>
+                {
+                    b.HasOne("Database.Entities.AppointmentLocationEntity", "Location")
+                        .WithMany()
+                        .HasForeignKey("LocationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Location");
+                });
+
+            modelBuilder.Entity("Database.Entities.SeenAppointmentEntity", b =>
                 {
                     b.HasOne("Database.Entities.AppointmentLocationEntity", "Location")
                         .WithMany()
